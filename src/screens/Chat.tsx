@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../lib/firebase';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { apiFetch } from '../lib/api';
 import { ChatMessage, UserProfile, Job } from '../types';
 import { motion } from 'motion/react';
 import { ChevronLeft, Send, Paperclip, Loader2 } from 'lucide-react';
-import { handleFirestoreError } from '../lib/utils';
 
 interface ChatProps {
   jobId: string;
@@ -19,23 +17,46 @@ export default function Chat({ jobId, user, onBack }: ChatProps) {
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const loadChat = async () => {
+    const [jobRes, messagesRes] = await Promise.all([
+      apiFetch<{ data: Job }>(`/jobs/${jobId}`),
+      apiFetch<{ data: ChatMessage[] }>(`/jobs/${jobId}/messages?actorId=${encodeURIComponent(user.uid)}`, {
+        headers: {
+          'x-user-id': user.uid,
+        },
+      }),
+    ]);
+
+    setJob(jobRes.data);
+    setMessages(messagesRes.data || []);
+  };
+
   useEffect(() => {
-    const jobRef = doc(db, 'jobs', jobId);
-    getDoc(jobRef).then(d => {
-      if (d.exists()) setJob({ id: d.id, ...d.data() } as Job);
-    });
+    let mounted = true;
 
-    const messagesRef = collection(db, 'jobs', jobId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'asc'));
+    const fetchData = async () => {
+      try {
+        await loadChat();
+      } catch (error: any) {
+        if (mounted) {
+          alert(`Gagal memuat chat: ${error.message}`);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage));
-      setMessages(data);
-      setLoading(false);
-    });
+    fetchData();
 
-    return () => unsubscribe();
-  }, [jobId]);
+    const polling = window.setInterval(fetchData, 3000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(polling);
+    };
+  }, [jobId, user.uid]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -51,14 +72,20 @@ export default function Chat({ jobId, user, onBack }: ChatProps) {
     setInputText('');
     
     try {
-      await addDoc(collection(db, 'jobs', jobId, 'messages'), {
-        jobId,
-        senderId: user.uid,
-        text,
-        createdAt: serverTimestamp(),
+      await apiFetch(`/jobs/${jobId}/messages`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          senderId: user.uid,
+          text,
+        }),
       });
+      await loadChat();
     } catch (error) {
-      handleFirestoreError(error, 'create', `jobs/${jobId}/messages`);
+      const message = error instanceof Error ? error.message : 'Gagal kirim pesan';
+      alert(message);
     }
   };
 
@@ -106,7 +133,7 @@ export default function Chat({ jobId, user, onBack }: ChatProps) {
               }`}>
                 <p className="text-sm font-medium leading-relaxed">{msg.text}</p>
                 <p className={`text-[10px] mt-1 font-bold ${isMe ? 'text-blue-100' : 'text-gray-400'}`}>
-                  {msg.createdAt?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                 </p>
               </div>
             </div>

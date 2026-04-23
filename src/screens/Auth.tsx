@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Chrome } from 'lucide-react';
+import { UserCircle2 } from 'lucide-react';
 
 interface AuthProps {
   onLogin: () => void;
@@ -24,8 +24,8 @@ export default function Auth({ onLogin }: AuthProps) {
         onClick={onLogin}
         className="w-full h-14 border-2 border-gray-100 rounded-3xl flex items-center justify-center gap-3 font-bold text-gray-700 hover:bg-gray-50 active:scale-95 transition-all shadow-sm"
       >
-        <Chrome className="w-6 h-6 text-red-500" />
-        Masuk via Google
+        <UserCircle2 className="w-6 h-6 text-blue-500" />
+        Masuk Cepat
       </button>
 
       <div className="mt-8 flex items-center gap-4 w-full">

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { apiFetch } from '../lib/api';
 import { Job, UserProfile } from '../types';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, DollarSign, Users, Briefcase } from 'lucide-react';
+import { Search, Calendar, DollarSign, Users, Briefcase } from 'lucide-react';
 
 interface FeedProps {
   user: UserProfile;
@@ -14,30 +13,44 @@ const categories = ['Semua', 'Tugas', 'Desain', 'Koding', 'Editing', 'Lainnya'];
 
 export default function Feed({ user, onJobClick }: FeedProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'jobs'),
-      where('status', '==', 'open'),
-      orderBy('createdAt', 'desc')
-    );
+    let mounted = true;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Job));
-      setJobs(data);
-    }, (error) => {
-      console.error("Feed fetch error:", error);
-      alert(`Gagal memuat daftar kerjaan: ${error.message}\n\nPastikan Firestore sudah aktif dan Rules sudah di-Publish.`);
-    });
+    const loadJobs = async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({ status: 'open', limit: '100' });
+        if (selectedCategory !== 'Semua') params.set('category', selectedCategory);
+        if (searchQuery.trim()) params.set('q', searchQuery.trim());
 
-    return () => unsubscribe();
-  }, []);
+        const response = await apiFetch<{ data: Job[] }>(`/jobs?${params.toString()}`);
+        if (mounted) {
+          setJobs(response.data || []);
+        }
+      } catch (error: any) {
+        console.error('Feed fetch error:', error);
+        alert(`Gagal memuat daftar kerjaan: ${error.message}`);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadJobs();
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedCategory, searchQuery]);
 
   const filteredJobs = jobs.filter(job => {
     const matchesCategory = selectedCategory === 'Semua' || job.category === selectedCategory;
-    const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          job.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -93,7 +106,11 @@ export default function Feed({ user, onJobClick }: FeedProps) {
       </header>
 
       <main className="flex-1 overflow-y-auto px-6 pt-4 space-y-4">
-        {filteredJobs.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <h3 className="font-bold text-gray-900 text-lg">Memuat kerjaan...</h3>
+          </div>
+        ) : filteredJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mb-4 text-gray-300">
               <Briefcase className="w-10 h-10" />

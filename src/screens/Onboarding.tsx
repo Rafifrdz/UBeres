@@ -142,7 +142,7 @@ export default function Onboarding({ onLogin, onComplete }: OnboardingProps) {
           onClick={onLogin}
           className="mt-6 text-gray-400 font-medium hover:text-blue-500"
         >
-          Udah punya akun? Login
+          Lewati dan masuk cepat
         </button>
       </div>
     </motion.div>

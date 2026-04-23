@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { db, auth } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { apiFetch } from '../lib/api';
 import { motion } from 'motion/react';
-import { ChevronLeft, Info, AlertCircle, Loader2 } from 'lucide-react';
-import { handleFirestoreError } from '../lib/utils';
+import { ChevronLeft, Info, Loader2 } from 'lucide-react';
+import { UserProfile } from '../types';
 
 interface PostJobProps {
+  user: UserProfile;
   onBack: () => void;
   onSuccess: () => void;
 }
 
 const categories = ['Tugas', 'Desain', 'Koding', 'Editing', 'Lainnya'];
 
-export default function PostJob({ onBack, onSuccess }: PostJobProps) {
+export default function PostJob({ user, onBack, onSuccess }: PostJobProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -24,23 +24,25 @@ export default function PostJob({ onBack, onSuccess }: PostJobProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser || !formData.title || !formData.description) return;
+    if (!formData.title || !formData.description) return;
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'jobs'), {
+      await apiFetch('/jobs', {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
         ...formData,
         budget: parseInt(formData.budget) || 0,
-        clientId: auth.currentUser.uid,
-        status: 'open',
-        bidCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+          clientId: user.uid,
+        }),
       });
       onSuccess();
     } catch (error: any) {
       console.error("Gagal posting kerjaan:", error);
-      alert(`Gagal posting kerjaan: ${error.message}\n\nPastikan Firestore sudah di-aktifkan di Console.`);
+      alert(`Gagal posting kerjaan: ${error.message}`);
     } finally {
       setLoading(false);
     }

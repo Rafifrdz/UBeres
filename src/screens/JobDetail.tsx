@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, addDoc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { apiFetch } from '../lib/api';
 import { Job, Bid, UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, Calendar, DollarSign, Clock, User, Star, MessageSquare, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { handleFirestoreError } from '../lib/utils';
+import { ChevronLeft, DollarSign, Clock, Star, MessageSquare, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface JobDetailProps {
   jobId: string;
@@ -22,32 +20,37 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   const [bidPitch, setBidPitch] = useState('');
   const [submittingBid, setSubmittingBid] = useState(false);
 
+  const loadJobAndBids = async () => {
+    const [jobRes, bidsRes] = await Promise.all([
+      apiFetch<{ data: Job }>(`/jobs/${jobId}`),
+      apiFetch<{ data: Bid[] }>(`/jobs/${jobId}/bids`),
+    ]);
+
+    setJob(jobRes.data);
+    setBids(bidsRes.data || []);
+  };
+
   useEffect(() => {
-    const jobRef = doc(db, 'jobs', jobId);
-    const unsubscribeJob = onSnapshot(jobRef, (doc) => {
-      if (doc.exists()) {
-        setJob({ id: doc.id, ...doc.data() } as Job);
+    let mounted = true;
+    const load = async () => {
+      try {
+        setLoading(true);
+        await loadJobAndBids();
+      } catch (error: any) {
+        console.error('Job detail error:', error);
+        if (mounted) {
+          alert(`Gagal memuat detail kerjaan: ${error.message}`);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
-    }, (error) => {
-      console.error("Job detail error:", error);
-      alert(`Gagal memuat detail kerjaan: ${error.message}\n\nPastikan Firestore Rules sudah di-Publish di Firebase Console.`);
-      setLoading(false);
-    });
+    };
 
-    const bidsRef = collection(db, 'jobs', jobId, 'bids');
-    const qBids = query(bidsRef);
-    const unsubscribeBids = onSnapshot(qBids, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Bid));
-      setBids(data);
-    }, (error) => {
-      console.error("Bids fetch error:", error);
-      // Don't alert here to avoid double alerts, but log it
-    });
-
+    load();
     return () => {
-      unsubscribeJob();
-      unsubscribeBids();
+      mounted = false;
     };
   }, [jobId]);
 
@@ -57,21 +60,26 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
 
     setSubmittingBid(true);
     try {
-      await addDoc(collection(db, 'jobs', jobId, 'bids'), {
-        jobId,
+      await apiFetch(`/jobs/${jobId}/bids`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
         workerId: user.uid,
         workerName: user.displayName,
-        workerRating: user.rating,
+        workerRating: user.rating || 5,
         price: parseInt(bidPrice),
         pitch: bidPitch,
-        createdAt: serverTimestamp(),
-      });
-      await updateDoc(doc(db, 'jobs', jobId), {
-        bidCount: increment(1)
+        }),
       });
       setShowBidForm(false);
+      setBidPitch('');
+      setBidPrice('');
+      await loadJobAndBids();
     } catch (error) {
-      handleFirestoreError(error, 'create', `jobs/${jobId}/bids`);
+      const message = error instanceof Error ? error.message : 'Gagal kirim bid';
+      alert(message);
     } finally {
       setSubmittingBid(false);
     }
@@ -80,49 +88,81 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   const handleSelectWorker = async (bid: Bid) => {
     if (!job || job.clientId !== user.uid) return;
     try {
-      await updateDoc(doc(db, 'jobs', jobId), {
-        workerId: bid.workerId,
-        status: 'assigned',
-        updatedAt: serverTimestamp(),
+      await apiFetch(`/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          actorId: user.uid,
+          status: 'assigned',
+          workerId: bid.workerId,
+        }),
       });
+      await loadJobAndBids();
     } catch (error) {
-      handleFirestoreError(error, 'update', `jobs/${jobId}`);
+      const message = error instanceof Error ? error.message : 'Gagal memilih worker';
+      alert(message);
     }
   };
 
   const handlePayment = async () => {
     if (!job || job.clientId !== user.uid) return;
     try {
-      await updateDoc(doc(db, 'jobs', jobId), {
-        status: 'paid',
-        updatedAt: serverTimestamp(),
+      await apiFetch(`/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          actorId: user.uid,
+          status: 'paid',
+        }),
       });
+      await loadJobAndBids();
     } catch (error) {
-      handleFirestoreError(error, 'update', `jobs/${jobId}`);
+      const message = error instanceof Error ? error.message : 'Gagal update status';
+      alert(message);
     }
   };
 
   const handleDone = async () => {
     if (!job || job.clientId !== user.uid) return;
     try {
-      await updateDoc(doc(db, 'jobs', jobId), {
-        status: 'completed',
-        updatedAt: serverTimestamp(),
+      await apiFetch(`/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          actorId: user.uid,
+          status: 'completed',
+        }),
       });
+      await loadJobAndBids();
     } catch (error) {
-      handleFirestoreError(error, 'update', `jobs/${jobId}`);
+      const message = error instanceof Error ? error.message : 'Gagal update status';
+      alert(message);
     }
   };
 
   const handleSubmission = async () => {
     if (!job || job.workerId !== user.uid) return;
     try {
-      await updateDoc(doc(db, 'jobs', jobId), {
-        status: 'submitting',
-        updatedAt: serverTimestamp(),
+      await apiFetch(`/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'x-user-id': user.uid,
+        },
+        body: JSON.stringify({
+          actorId: user.uid,
+          status: 'submitting',
+        }),
       });
+      await loadJobAndBids();
     } catch (error) {
-      handleFirestoreError(error, 'update', `jobs/${jobId}`);
+      const message = error instanceof Error ? error.message : 'Gagal update status';
+      alert(message);
     }
   };
 

@@ -1,20 +1,9 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
-
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+// Firebase has been removed from runtime paths.
+// Keep this file as a compatibility stub while migration is in progress.
+export const db = null;
+export const auth = null;
+export const googleProvider = null;
 
 export async function testConnection() {
-  try {
-    // Just a simple check to see if we can reach Firestore
-    console.log("Testing Firebase connection...");
-  } catch (error) {
-    console.error("Firebase connection error:", error);
-  }
+  return;
 }
-
-export type { FirebaseUser };

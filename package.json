@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "server:dev": "tsx watch server/src/index.ts",
+    "server:start": "tsx server/src/index.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "mongo:setup": "tsx scripts/setup-mongodb.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -17,8 +20,8 @@
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "firebase": "^12.12.1",
     "lucide-react": "^0.546.0",
+    "mongodb": "^6.21.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

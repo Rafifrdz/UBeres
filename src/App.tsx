@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db, googleProvider } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile, UserRole } from './types';
-import { testConnection } from './lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, Home, PlusSquare, MessageCircle, User, Loader2 } from 'lucide-react';
+import { Home, PlusSquare, User, Loader2 } from 'lucide-react';
 import Onboarding from './screens/Onboarding';
 import Auth from './screens/Auth';
 import Feed from './screens/Feed';
@@ -15,6 +11,23 @@ import Chat from './screens/Chat';
 import Profile from './screens/Profile';
 
 type Screen = 'onboarding' | 'auth' | 'feed' | 'post' | 'detail' | 'chat' | 'profile';
+const LOCAL_USER_KEY = 'uberes_local_user';
+
+function saveLocalUser(profile: UserProfile) {
+  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(profile));
+}
+
+function loadLocalUser(): UserProfile | null {
+  const raw = localStorage.getItem(LOCAL_USER_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    localStorage.removeItem(LOCAL_USER_KEY);
+    return null;
+  }
+}
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -23,78 +36,61 @@ export default function App() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   useEffect(() => {
-    testConnection();
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      try {
-        if (fbUser) {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
-          if (userDoc.exists()) {
-            setUser(userDoc.data() as UserProfile);
-            if (currentScreen === 'onboarding' || currentScreen === 'auth') {
-              setCurrentScreen('feed');
-            }
-          } else {
-            setCurrentScreen('onboarding');
-          }
-        } else {
-          setUser(null);
-          if (currentScreen !== 'onboarding') {
-            setCurrentScreen('onboarding');
-          }
-        }
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        // Fallback to onboarding if Firestore fails
-        setCurrentScreen('onboarding');
-      } finally {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
+    const localUser = loadLocalUser();
+    if (localUser) {
+      setUser(localUser);
+      setCurrentScreen('feed');
+    } else {
+      setCurrentScreen('onboarding');
+    }
+    setLoading(false);
   }, []);
 
   const handleLogin = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      if (userDoc.exists()) {
-        setUser(userDoc.data() as UserProfile);
-        setCurrentScreen('feed');
-      } else {
-        setCurrentScreen('onboarding');
-      }
+      const profile: UserProfile = {
+        uid: `local-${crypto.randomUUID()}`,
+        displayName: 'Student UB',
+        email: '',
+        photoURL: '',
+        role: 'client',
+        createdAt: new Date(),
+      };
+
+      saveLocalUser(profile);
+      setUser(profile);
+      setCurrentScreen('feed');
     } catch (error: any) {
-      console.error("Login failed", error);
-      alert(`Login Gagal: ${error.message}\n\nPastikan Google Auth sudah aktif di Firebase Console.`);
+      console.error('Login failed', error);
+      alert(`Login Gagal: ${error.message}`);
     }
   };
 
   const handleCompleteOnboarding = async (role: UserRole) => {
     try {
-      let fbUser = auth.currentUser;
-      if (!fbUser) {
-        const result = await signInWithPopup(auth, googleProvider);
-        fbUser = result.user;
-      }
+      const profile: UserProfile = {
+        uid: `local-${crypto.randomUUID()}`,
+        displayName: 'Student UB',
+        email: '',
+        photoURL: '',
+        role,
+        createdAt: new Date(),
+      };
 
-      if (fbUser) {
-        const profile: UserProfile = {
-          uid: fbUser.uid,
-          displayName: fbUser.displayName || 'Student',
-          email: fbUser.email || '',
-          photoURL: fbUser.photoURL || '',
-          role,
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(doc(db, 'users', profile.uid), profile);
-        setUser(profile);
-        setCurrentScreen('feed');
-      }
+      saveLocalUser(profile);
+      setUser(profile);
+      setCurrentScreen('feed');
     } catch (error: any) {
-      console.error("Onboarding failed", error);
-      alert(`Gagal menyimpan data: ${error.message}\n\nPastikan Firestore sudah aktif dan rules-nya benar.`);
+      console.error('Onboarding failed', error);
+      alert(`Gagal menyimpan data: ${error.message}`);
     }
+  };
+
+  const handleLogout = async () => {
+    localStorage.removeItem(LOCAL_USER_KEY);
+    setUser(null);
+    setSelectedJobId(null);
+    setCurrentScreen('onboarding');
   };
 
   if (loading) {
@@ -135,7 +131,7 @@ export default function App() {
         )}
         {currentScreen === 'post' && user && (
           <motion.div key="post" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
-            <PostJob onBack={() => setCurrentScreen('feed')} onSuccess={() => setCurrentScreen('feed')} />
+            <PostJob user={user} onBack={() => setCurrentScreen('feed')} onSuccess={() => setCurrentScreen('feed')} />
           </motion.div>
         )}
         {currentScreen === 'detail' && selectedJobId && user && (
@@ -159,7 +155,7 @@ export default function App() {
         )}
         {currentScreen === 'profile' && user && (
           <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
-            <Profile user={user} onLogout={() => signOut(auth)} />
+            <Profile user={user} onLogout={handleLogout} />
           </motion.div>
         )}
       </AnimatePresence>
