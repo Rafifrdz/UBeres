@@ -23,6 +23,8 @@ export interface Job {
   deadline: any;
   category: string;
   clientId: string;
+  clientName?: string;
+  clientPhotoURL?: string;
   workerId?: string;
   status: JobStatus;
   bidCount: number;
@@ -37,6 +39,7 @@ export interface Bid {
   workerName: string;
   workerRating?: number;
   price: number;
+  deliveryDays: number;
   pitch: string;
   createdAt: any;
 }

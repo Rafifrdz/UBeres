@@ -133,9 +133,9 @@ export default function App() {
             <Feed user={user} onJobClick={navigateToJob} />
           </motion.div>
         )}
-        {currentScreen === 'post' && user && (
+        {currentScreen === 'post' && user && user.role === 'client' && (
           <motion.div key="post" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
-            <PostJob onBack={() => setCurrentScreen('feed')} onSuccess={() => setCurrentScreen('feed')} />
+            <PostJob user={user} onBack={() => setCurrentScreen('feed')} onSuccess={() => setCurrentScreen('feed')} />
           </motion.div>
         )}
         {currentScreen === 'detail' && selectedJobId && user && (
