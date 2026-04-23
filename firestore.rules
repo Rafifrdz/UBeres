@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // User Validation
+    function isValidUser(data) {
+      return data.uid == request.auth.uid 
+        && data.displayName is string && data.displayName.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && data.role in ['client', 'worker'];
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming()) 
+        && !('rating' in incoming()) && !('totalRatings' in incoming())
+        && (!('portfolio' in incoming()) || (incoming().portfolio is list && incoming().portfolio.size() <= 10));
+      allow update: if isOwner(userId) && isValidUser(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'portfolio'])
+        && incoming().uid == existing().uid && incoming().role == existing().role
+        && (!('portfolio' in incoming()) || (incoming().portfolio is list && incoming().portfolio.size() <= 10));
+    }
+
+    // Job Validation
+    function isValidJob(data) {
+      return data.title is string && data.title.size() <= 150
+        && data.description is string && data.description.size() <= 2000
+        && data.clientId == request.auth.uid
+        && data.status in ['open', 'assigned', 'paid', 'working', 'submitting', 'completed']
+        && data.createdAt == (resource == null ? request.time : existing().createdAt)
+        && data.updatedAt == request.time;
+    }
+
+    match /jobs/{jobId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.status == 'open';
+      allow create: if isSignedIn() && isValidId(jobId) && isValidJob(incoming()) && incoming().status == 'open';
+      allow update: if isSignedIn() && (
+        // Client actions
+        (isOwner(existing().clientId) && incoming().clientId == existing().clientId && (
+          // Assign worker
+          (existing().status == 'open' && incoming().status == 'assigned' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'workerId', 'updatedAt'])) ||
+          // Pay escrow
+          (existing().status == 'assigned' && incoming().status == 'paid' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+          // Complete job
+          (existing().status == 'submitting' && incoming().status == 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+        )) ||
+        // Worker actions
+        (isOwner(existing().workerId) && (
+          // Start working
+          (existing().status == 'paid' && incoming().status == 'working' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+          // Submit result
+          (existing().status == 'working' && incoming().status == 'submitting' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+        ))
+      );
+      allow delete: if isOwner(existing().clientId) && existing().status == 'open';
+    }
+
+    // Bid Validation
+    function isValidBid(data, jId) {
+      return data.jobId == jId
+        && data.workerId == request.auth.uid
+        && data.price is number && data.price > 0
+        && data.pitch is string && data.pitch.size() <= 500
+        && data.createdAt == request.time;
+    }
+
+    match /jobs/{jobId}/bids/{bidId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidBid(incoming(), jobId) 
+        && get(/databases/$(database)/documents/jobs/$(jobId)).data.status == 'open';
+      allow delete: if isOwner(existing().workerId);
+    }
+
+    // Chat Validation
+    function isValidMessage(data, jId) {
+      return data.jobId == jId
+        && data.senderId == request.auth.uid
+        && data.text is string && data.text.size() <= 1000
+        && data.createdAt == request.time;
+    }
+
+    match /jobs/{jobId}/messages/{messageId} {
+      allow list: if isSignedIn() && (isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.clientId) || isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.workerId));
+      allow create: if isSignedIn() && isValidMessage(incoming(), jobId)
+        && (isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.clientId) || isOwner(get(/databases/$(database)/documents/jobs/$(jobId)).data.workerId));
+    }
+  }
+}

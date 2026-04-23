@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a student user on the platform, either a Client or a Worker.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "worker"] },
+        "rating": { "type": "number" },
+        "totalRatings": { "type": "number" },
+        "bio": { "type": "string" },
+        "portfolio": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "role"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A job posted by a client.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "budget": { "type": "number" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "clientId": { "type": "string" },
+        "workerId": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "assigned", "paid", "working", "submitting", "completed"] },
+        "bidCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "clientId", "status"]
+    },
+    "Bid": {
+      "title": "Bid",
+      "description": "A bid placed by a worker on a job.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "workerRating": { "type": "number" },
+        "price": { "type": "number" },
+        "pitch": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "workerId", "price", "pitch"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message in a job chat.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "fileURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "senderId", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Job listings"
+    },
+    "/jobs/{jobId}/bids/{bidId}": {
+      "schema": "Bid",
+      "description": "Bids for a specific job"
+    },
+    "/jobs/{jobId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages for a job"
+    }
+  }
+}
