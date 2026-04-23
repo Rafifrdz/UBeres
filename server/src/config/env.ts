@@ -12,4 +12,5 @@ export const env = {
   apiPort: Number(process.env.API_PORT ?? 8080),
   mongodbUri: required('MONGODB_URI'),
   mongodbDbName: required('MONGODB_DB_NAME', 'uberes'),
+  googleClientId: required('GOOGLE_CLIENT_ID'),
 };

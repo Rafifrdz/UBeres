@@ -22,3 +22,10 @@ export async function closeMongo(): Promise<void> {
   client = null;
   db = null;
 }
+
+export function getDb(): Db {
+  if (!db) {
+    throw new Error('Database not connected. Call connectMongo() first.');
+  }
+  return db;
+}

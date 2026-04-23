@@ -2,6 +2,7 @@ import express from 'express';
 import { env } from './config/env';
 import { connectMongo, closeMongo } from './db/mongo';
 import jobsRouter from './routes/jobs';
+import authRouter from './routes/auth';
 
 async function bootstrap() {
   await connectMongo();
@@ -22,6 +23,7 @@ async function bootstrap() {
     res.json({ ok: true, service: 'uberes-api' });
   });
 
+  app.use('/api/auth', authRouter);
   app.use('/api/jobs', jobsRouter);
 
   const server = app.listen(env.apiPort, () => {

@@ -34,6 +34,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentScreen, setCurrentScreen] = useState<Screen>('onboarding');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
 
   useEffect(() => {
     const localUser = loadLocalUser();
@@ -50,10 +51,10 @@ export default function App() {
     try {
       const profile: UserProfile = {
         uid: `local-${crypto.randomUUID()}`,
-        displayName: 'Student UB',
+        displayName: 'Student UB (Guest)',
         email: '',
         photoURL: '',
-        role: 'client',
+        role: pendingRole || 'client',
         createdAt: new Date(),
       };
 
@@ -67,30 +68,45 @@ export default function App() {
   };
 
   const handleCompleteOnboarding = async (role: UserRole) => {
-    try {
-      const profile: UserProfile = {
-        uid: `local-${crypto.randomUUID()}`,
-        displayName: 'Student UB',
-        email: '',
-        photoURL: '',
-        role,
-        createdAt: new Date(),
-      };
-
-      saveLocalUser(profile);
-      setUser(profile);
-      setCurrentScreen('feed');
-    } catch (error: any) {
-      console.error('Onboarding failed', error);
-      alert(`Gagal menyimpan data: ${error.message}`);
-    }
+    setPendingRole(role);
+    setCurrentScreen('auth');
   };
 
   const handleLogout = async () => {
     localStorage.removeItem(LOCAL_USER_KEY);
     setUser(null);
     setSelectedJobId(null);
+    setPendingRole(null);
     setCurrentScreen('onboarding');
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      setLoading(true);
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${apiBaseUrl}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          credential: credentialResponse.credential,
+          role: pendingRole || 'client'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal verifikasi dengan server');
+      }
+
+      const { user: profile } = await response.json();
+      saveLocalUser(profile);
+      setUser(profile);
+      setCurrentScreen('feed');
+    } catch (error: any) {
+      console.error('Google Auth Failed', error);
+      alert(`Login Google Gagal: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -116,12 +132,12 @@ export default function App() {
       <AnimatePresence mode="wait">
         {currentScreen === 'onboarding' && (
           <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
-            <Onboarding onLogin={handleLogin} onComplete={handleCompleteOnboarding} />
+            <Onboarding onLogin={() => setCurrentScreen('auth')} onComplete={handleCompleteOnboarding} />
           </motion.div>
         )}
         {currentScreen === 'auth' && (
           <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col">
-            <Auth onLogin={handleLogin} />
+            <Auth onLogin={handleLogin} onGoogleSuccess={handleGoogleSuccess} />
           </motion.div>
         )}
         {currentScreen === 'feed' && user && (
