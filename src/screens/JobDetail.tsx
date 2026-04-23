@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/api';
 import { Job, Bid, UserProfile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, DollarSign, Clock, Star, MessageSquare, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ChevronLeft, DollarSign, Clock, Star, MessageSquare, CheckCircle, AlertCircle, Loader2, User } from 'lucide-react';
 
 interface JobDetailProps {
   jobId: string;
@@ -20,7 +20,6 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   const [bidDays, setBidDays] = useState('7');
   const [bidPitch, setBidPitch] = useState('');
   const [submittingBid, setSubmittingBid] = useState(false);
-  const [clientProfile, setClientProfile] = useState<UserProfile | null>(null);
 
   const loadJobAndBids = async () => {
     const [jobRes, bidsRes] = await Promise.all([
@@ -55,18 +54,6 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
       mounted = false;
     };
   }, [jobId]);
-
-  useEffect(() => {
-    if (job?.clientId) {
-      const fetchClient = async () => {
-        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
-        if (clientDoc.exists()) {
-          setClientProfile(clientDoc.data() as UserProfile);
-        }
-      };
-      fetchClient();
-    }
-  }, [job?.clientId]);
 
   const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,7 +249,7 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
         </div>
 
         {/* About the Client */}
-        {clientProfile && (
+        {job && (
           <div className="bg-white p-6 pb-8 shadow-sm border-b border-gray-100">
             <div className="flex items-center gap-1.5 mb-5">
               <div className="w-1 h-3 bg-orange-500 rounded-full" />
@@ -271,24 +258,22 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
 
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
-                {clientProfile.photoURL ? (
-                  <img src={clientProfile.photoURL} alt={clientProfile.displayName} className="w-full h-full object-cover" />
+                {job.clientPhotoURL ? (
+                  <img src={job.clientPhotoURL} alt={job.clientName} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-blue-600 font-bold text-base">{clientProfile.displayName[0]}</span>
+                  <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-500 font-bold">
+                    <User className="w-5 h-5" />
+                  </div>
                 )}
               </div>
               <div>
-                <h3 className="text-sm font-black text-gray-900 leading-none mb-1">{clientProfile.displayName}</h3>
+                <h3 className="text-sm font-black text-gray-900 leading-none mb-1">{job.clientName || 'User UBeres'}</h3>
                 <div className="flex items-center gap-1 text-[9px] text-orange-500 font-black uppercase tracking-wider">
                   <Star className="w-2.5 h-2.5 fill-orange-500" />
-                  <span>{clientProfile.rating?.toFixed(1) || '5.0'} Rating</span>
+                  <span>5.0 Rating</span>
                 </div>
               </div>
             </div>
-
-            {clientProfile.bio && (
-              <p className="text-[10px] text-gray-500 italic leading-relaxed">"{clientProfile.bio}"</p>
-            )}
           </div>
         )}
 

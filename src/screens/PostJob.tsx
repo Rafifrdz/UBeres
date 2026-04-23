@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { motion } from 'motion/react';
-import { ChevronLeft, Info, Loader2 } from 'lucide-react';
+import { ChevronLeft, Info, Loader2, AlertCircle } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface PostJobProps {

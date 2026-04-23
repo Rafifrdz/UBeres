@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/api';
 import { Job, UserProfile } from '../types';
 import { motion } from 'motion/react';
-import { Search, Filter, Calendar, DollarSign, Users, Briefcase, Heart, Bookmark } from 'lucide-react';
+import { Search, Filter, Calendar, DollarSign, Users, Briefcase, Heart, Bookmark, User } from 'lucide-react';
 
 interface FeedProps {
   user: UserProfile;
