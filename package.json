@@ -14,7 +14,9 @@
     "mongo:setup": "tsx scripts/setup-mongodb.ts"
   },
   "dependencies": {
+    "@dotlottie/react-player": "^1.6.19",
     "@google/genai": "^1.29.0",
+    "@lottiefiles/dotlottie-react": "^0.19.0",
     "@react-oauth/google": "^0.13.5",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

@@ -28,6 +28,7 @@ export interface Job {
   workerId?: string;
   status: JobStatus;
   bidCount: number;
+  isFixedPrice?: boolean;
   createdAt: any;
   updatedAt: any;
 }

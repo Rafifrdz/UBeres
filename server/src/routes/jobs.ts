@@ -2,15 +2,17 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { connectMongo } from '../db/mongo';
 
-type JobStatus = 'open' | 'assigned' | 'paid' | 'working' | 'submitting' | 'completed';
+type JobStatus = 'open' | 'assigned' | 'paid' | 'working' | 'submitting' | 'completed' | 'disputed' | 'refunded';
 
-const validStatuses: JobStatus[] = ['open', 'assigned', 'paid', 'working', 'submitting', 'completed'];
+const validStatuses: JobStatus[] = ['open', 'assigned', 'paid', 'working', 'submitting', 'completed', 'disputed', 'refunded'];
 const allowedTransitions: Record<JobStatus, JobStatus[]> = {
   open: ['assigned'],
   assigned: ['paid'],
-  paid: ['working'],
-  working: ['submitting'],
-  submitting: ['completed'],
+  paid: ['working', 'completed', 'disputed'],
+  working: ['submitting', 'completed', 'disputed'],
+  submitting: ['completed', 'disputed'],
+  disputed: ['refunded', 'completed'],
+  refunded: [],
   completed: [],
 };
 
@@ -53,15 +55,20 @@ async function getJobOr404(jobId: string) {
 router.get('/', async (req, res) => {
   const db = await connectMongo();
 
-  const status = String(req.query.status ?? 'open');
+  const status = String(req.query.status ?? '');
   const category = String(req.query.category ?? '').trim();
   const q = String(req.query.q ?? '').trim();
+  const clientId = String(req.query.clientId ?? '').trim();
   const limit = Math.min(Number(req.query.limit ?? 50), 200);
 
   const filter: Record<string, unknown> = {};
 
-  if (validStatuses.includes(status as JobStatus)) {
+  if (status && validStatuses.includes(status as JobStatus)) {
     filter.status = status;
+  }
+
+  if (clientId) {
+    filter.clientId = clientId;
   }
 
   if (category) {
@@ -189,7 +196,7 @@ router.patch('/:jobId/status', async (req, res) => {
     }
   }
 
-  if (nextStatus === 'paid' || nextStatus === 'completed') {
+  if (nextStatus === 'paid' || nextStatus === 'completed' || nextStatus === 'disputed') {
     if (actorId !== currentClientId) {
       return res.status(403).json({ error: 'Aksi ini hanya boleh dilakukan client' });
     }

@@ -141,7 +141,12 @@ export default function Chat({ jobId, user, onBack }: ChatProps) {
         })}
       </div>
 
-      <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-gray-100 flex items-center gap-3 pb-8">
+      <form onSubmit={handleSendMessage} className="p-6 bg-white border-t border-gray-100 flex items-center gap-3 pb-8 relative">
+        {user.uid.startsWith('local-') && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-20 flex items-center justify-center px-6">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Login untuk mulai ngobrol</p>
+          </div>
+        )}
         <button type="button" className="p-3 text-gray-400 hover:text-blue-500 bg-gray-50 rounded-2xl transition-all">
           <Paperclip className="w-5 h-5" />
         </button>
