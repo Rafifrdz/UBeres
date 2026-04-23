@@ -17,8 +17,10 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   const [loading, setLoading] = useState(true);
   const [showBidForm, setShowBidForm] = useState(false);
   const [bidPrice, setBidPrice] = useState('');
+  const [bidDays, setBidDays] = useState('7');
   const [bidPitch, setBidPitch] = useState('');
   const [submittingBid, setSubmittingBid] = useState(false);
+  const [clientProfile, setClientProfile] = useState<UserProfile | null>(null);
 
   const loadJobAndBids = async () => {
     const [jobRes, bidsRes] = await Promise.all([
@@ -54,9 +56,30 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
     };
   }, [jobId]);
 
+  useEffect(() => {
+    if (job?.clientId) {
+      const fetchClient = async () => {
+        const clientDoc = await getDoc(doc(db, 'users', job.clientId));
+        if (clientDoc.exists()) {
+          setClientProfile(clientDoc.data() as UserProfile);
+        }
+      };
+      fetchClient();
+    }
+  }, [job?.clientId]);
+
   const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bidPrice || !bidPitch) return;
+    if (!bidPrice || !bidPitch) {
+      alert("Tolong isi harga dan alasan kamu!");
+      return;
+    }
+
+    const priceNum = parseInt(bidPrice.replace(/[^0-9]/g, ''));
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert("Harga tawar harus berupa angka yang valid!");
+      return;
+    }
 
     setSubmittingBid(true);
     try {
@@ -69,17 +92,20 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
         workerId: user.uid,
         workerName: user.displayName,
         workerRating: user.rating || 5,
-        price: parseInt(bidPrice),
+        price: priceNum,
+        deliveryDays: parseInt(bidDays) || 7,
         pitch: bidPitch,
         }),
       });
+
+      alert("🎉 Bid kamu berhasil dikirim!");
       setShowBidForm(false);
-      setBidPitch('');
       setBidPrice('');
+      setBidPitch('');
       await loadJobAndBids();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Gagal kirim bid';
-      alert(message);
+    } catch (error: any) {
+      console.error("Bid submission error:", error);
+      alert(`Gagal ngirim bid: ${error.message}`);
     } finally {
       setSubmittingBid(false);
     }
@@ -181,63 +207,113 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   const isSelectedWorker = job.workerId === user.uid;
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 1.05 }}
       className="flex-1 flex flex-col bg-gray-50 overflow-y-auto pb-32"
     >
-      <div className="h-40 bg-blue-500 flex flex-col relative">
-        <button onClick={onBack} className="absolute top-6 left-5 p-2 bg-white/20 backdrop-blur-md rounded-xl hover:bg-white/30 transition-colors z-20">
-          <ChevronLeft className="w-5 h-5 text-white" />
-        </button>
-        <div className="absolute top-8 right-5 px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-full text-[9px] font-black text-white uppercase tracking-wider">
-          {job.category}
-        </div>
-        <div className="mt-auto p-5 text-white">
-          <h1 className="text-xl font-black mb-1">{job.title}</h1>
-          <div className="flex items-center gap-3 text-white/80 text-[10px] font-black uppercase tracking-wider leading-none">
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              <span>{job.status}</span>
+      <div className="h-52 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-700 flex flex-col relative overflow-hidden">
+        {/* Abstract background elements */}
+        <div className="absolute top-[-10%] right-[-10%] w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-32 h-32 bg-blue-400/20 rounded-full blur-2xl" />
+
+        <div className="relative z-10 flex flex-col h-full">
+          <div className="flex items-center justify-between px-5 pt-6">
+            <button onClick={onBack} className="p-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl hover:bg-white/20 transition-all active:scale-95 shadow-lg">
+              <ChevronLeft className="w-4 h-4 text-white" />
+            </button>
+            <div className="px-3 py-1 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full shadow-lg">
+              <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">{job.category}</span>
             </div>
-            <div className="w-1 h-1 bg-white/40 rounded-full" />
-            <div className="flex items-center gap-1">
-              <DollarSign className="w-3 h-3" />
-              <span>Rp {job.budget?.toLocaleString()}</span>
-            </div>
+          </div>
+
+          <div className="mt-auto p-5 pb-10">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-2"
+            >
+              <h1 className="text-xl font-black text-white leading-tight drop-shadow-sm">{job.title}</h1>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/10 backdrop-blur-md rounded-lg border border-white/10">
+                  <Clock className="w-2.5 h-2.5 text-blue-200" />
+                  <span className="text-[8px] font-black text-white uppercase tracking-wider">{job.status}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/20 backdrop-blur-md rounded-lg border border-green-500/20">
+                  <DollarSign className="w-2.5 h-2.5 text-green-300" />
+                  <span className="text-[8px] font-black text-white uppercase tracking-wider">Rp {job.budget?.toLocaleString()}</span>
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 mt-[-20px] bg-gray-50 rounded-t-[32px] overflow-hidden">
-        <div className="p-5 bg-white overflow-hidden shadow-sm">
-          <h2 className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Deskripsi</h2>
-          <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{job.description}</p>
+      <div className="flex-1 -mt-6 bg-gray-50 rounded-t-[32px] relative z-20 shadow-2xl overflow-hidden">
+        <div className="bg-white p-6 pb-8 shadow-sm border-b border-gray-100">
+          <div className="flex items-center gap-1.5 mb-3">
+            <div className="w-1 h-3 bg-blue-500 rounded-full" />
+            <h2 className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Deskripsi Pekerjaan</h2>
+          </div>
+          <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap font-medium">{job.description}</p>
         </div>
 
+        {/* About the Client */}
+        {clientProfile && (
+          <div className="bg-white p-6 pb-8 shadow-sm border-b border-gray-100">
+            <div className="flex items-center gap-1.5 mb-5">
+              <div className="w-1 h-3 bg-orange-500 rounded-full" />
+              <h2 className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Tentang Client</h2>
+            </div>
+
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center overflow-hidden border-2 border-white shadow-sm">
+                {clientProfile.photoURL ? (
+                  <img src={clientProfile.photoURL} alt={clientProfile.displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-blue-600 font-bold text-base">{clientProfile.displayName[0]}</span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 leading-none mb-1">{clientProfile.displayName}</h3>
+                <div className="flex items-center gap-1 text-[9px] text-orange-500 font-black uppercase tracking-wider">
+                  <Star className="w-2.5 h-2.5 fill-orange-500" />
+                  <span>{clientProfile.rating?.toFixed(1) || '5.0'} Rating</span>
+                </div>
+              </div>
+            </div>
+
+            {clientProfile.bio && (
+              <p className="text-[10px] text-gray-500 italic leading-relaxed">"{clientProfile.bio}"</p>
+            )}
+          </div>
+        )}
+
         {/* Action Buttons based on Status */}
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-3">
           {job.status === 'open' && isWorker && !hasBid && (
-            <button 
+            <button
               onClick={() => setShowBidForm(!showBidForm)}
-              className="w-full h-14 bg-blue-500 text-white rounded-2xl font-black text-base shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
+              className="w-full h-12 bg-blue-500 text-white rounded-xl font-black text-sm shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
             >
-              Tawar Kerjaan
+              Ambil Kerjaannya
             </button>
           )}
 
           {job.status === 'assigned' && isClient && (
             <div className="space-y-3">
-              <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
-                <p className="text-sm font-medium text-orange-800">
+              <div className="p-3.5 bg-orange-50 border border-orange-100 rounded-xl flex gap-3">
+                <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                <p className="text-[11px] font-medium text-orange-800">
                   Worker udah dipilih! Silahkan lakuin pembayaran biar worker langsung gas.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={handlePayment}
-                className="w-full h-16 bg-blue-500 text-white rounded-3xl font-black text-lg shadow-xl shadow-blue-100"
+                className="w-full h-14 bg-blue-500 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-100"
               >
                 Bayar Sekarang
               </button>
@@ -245,29 +321,29 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
           )}
 
           {job.status === 'working' && isSelectedWorker && (
-             <button 
-                onClick={handleSubmission}
-                className="w-full h-16 bg-blue-500 text-white rounded-3xl font-black text-lg shadow-xl shadow-blue-100"
-             >
-               Selesaiin Kerjaan
-             </button>
+            <button
+              onClick={handleSubmission}
+              className="w-full h-14 bg-blue-500 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-100"
+            >
+              Selesaiin Kerjaan
+            </button>
           )}
 
           {job.status === 'submitting' && isClient && (
-             <button 
-                onClick={handleDone}
-                className="w-full h-16 bg-green-500 text-white rounded-3xl font-black text-lg shadow-xl shadow-green-100"
-             >
-               Beresin Beresin!
-             </button>
+            <button
+              onClick={handleDone}
+              className="w-full h-14 bg-green-500 text-white rounded-2xl font-black text-base shadow-xl shadow-green-100"
+            >
+              Beresin Beresin!
+            </button>
           )}
 
           {isAssigned && (isClient || isSelectedWorker) && (
-            <button 
+            <button
               onClick={onChat}
-              className="w-full h-14 bg-white border-2 border-blue-100 text-blue-600 rounded-2xl font-black text-base flex items-center justify-center gap-2"
+              className="w-full h-12 bg-white border-2 border-blue-100 text-blue-600 rounded-xl font-black text-sm flex items-center justify-center gap-2"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="w-3.5 h-3.5" />
               Chat Personal
             </button>
           )}
@@ -276,87 +352,126 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
         {/* Bid Form Modal-like (simplified) */}
         <AnimatePresence>
           {showBidForm && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="px-6 mb-6"
+              exit={{ opacity: 0, y: 15 }}
+              className="px-5 mb-6"
             >
-              <form onSubmit={handlePlaceBid} className="bg-white p-5 rounded-2xl border-2 border-blue-500 shadow-xl space-y-4">
-                <h3 className="font-black text-lg text-gray-900">Bid Kamu</h3>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Harga Tawar (Rp)</label>
-                  <input 
-                    required type="number" 
-                    value={bidPrice} 
-                    onChange={e => setBidPrice(e.target.value)}
-                    className="w-full h-12 bg-gray-50 rounded-xl px-4 font-black text-blue-600 border-none focus:ring-2 focus:ring-blue-100 text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Kenapa Pilih Kamu?</label>
-                  <textarea 
-                    required rows={3}
-                    value={bidPitch} 
-                    onChange={e => setBidPitch(e.target.value)}
-                    className="w-full bg-gray-50 rounded-xl p-4 text-xs text-gray-700 border-none focus:ring-2 focus:ring-blue-100 resize-none"
-                  />
-                </div>
-                <button 
-                  disabled={submittingBid}
-                  className="w-full h-12 bg-blue-500 text-white rounded-xl font-black flex items-center justify-center text-sm"
-                >
-                  {submittingBid ? <Loader2 className="w-5 h-5 animate-spin" /> : "Kirim Bid"}
-                </button>
-              </form>
+              <div className="bg-white rounded-[24px] p-5 shadow-2xl shadow-blue-100 border border-blue-50 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+
+                <h3 className="font-black text-lg text-gray-900 mb-1">Tawar Kerjaan Ini</h3>
+                <p className="text-[10px] text-gray-400 font-medium mb-5">
+                  Berikan penawaran terbaikmu untuk membantu client.
+                </p>
+
+                <form onSubmit={handlePlaceBid} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-gray-900 uppercase tracking-widest px-1">Harga Tawar</label>
+                      <div className="relative group">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[10px]">Rp</div>
+                        <input
+                          required type="number"
+                          placeholder="50.000"
+                          value={bidPrice}
+                          onChange={e => setBidPrice(e.target.value)}
+                          className="w-full h-12 bg-gray-50 border-2 border-gray-100 rounded-xl pl-8 pr-3 font-black text-blue-600 focus:border-blue-500 focus:bg-white transition-all text-xs outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-black text-gray-900 uppercase tracking-widest px-1">Durasi Kerja</label>
+                      <div className="relative">
+                        <input
+                          required type="number"
+                          placeholder="7"
+                          value={bidDays}
+                          onChange={e => setBidDays(e.target.value)}
+                          className="w-full h-12 bg-gray-50 border-2 border-gray-100 rounded-xl px-3 font-black text-gray-900 focus:border-blue-500 focus:bg-white transition-all text-xs outline-none"
+                        />
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[8px] font-black text-gray-400">Hari</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[8px] font-black text-gray-900 uppercase tracking-widest">Kenapa kamu?</label>
+                      <span className="text-[8px] font-bold text-gray-400">(min 5 karakter)</span>
+                    </div>
+                    <textarea
+                      placeholder="Jelasin kenapa client harus pilih kamu..."
+                      value={bidPitch}
+                      onChange={e => setBidPitch(e.target.value)}
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3.5 text-xs text-gray-700 focus:border-blue-500 focus:bg-white transition-all resize-none h-24 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={submittingBid}
+                      className="h-12 px-6 bg-blue-500 text-white rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-100 hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 text-[11px] uppercase tracking-widest"
+                    >
+                      <span>{submittingBid ? "Mengirim..." : "Kirim Tawaran"}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Bids List */}
         <div className="p-6">
-          <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">List Penawar ({bids.length})</h2>
+          <div className="flex items-center gap-1.5 mb-6">
+            <div className="w-1 h-3 bg-blue-500 rounded-full" />
+            <h2 className="text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">List Penawar ({bids.length})</h2>
+          </div>
           {bids.length === 0 ? (
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 text-center">
-              <p className="text-gray-400 font-medium italic">Belum ada tawarannya nih...</p>
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 text-center">
+              <p className="text-[11px] text-gray-400 font-medium italic">Belum ada tawarannya nih...</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {bids.map((bid) => (
-                <div key={bid.id} className={`p-5 rounded-3xl border-2 transition-all ${job.workerId === bid.workerId ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-50'}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center font-black text-blue-500">
+                <div key={bid.id} className={`p-4 rounded-2xl border-2 transition-all ${job.workerId === bid.workerId ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-50'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center font-black text-blue-500 text-xs">
                         {bid.workerName[0]}
                       </div>
                       <div>
-                        <h4 className="font-black text-gray-900 leading-none mb-1">{bid.workerName}</h4>
-                        <div className="flex items-center gap-1 text-[10px] text-orange-500 font-black">
-                          <Star className="w-3 h-3 fill-orange-500" />
+                        <h4 className="text-xs font-black text-gray-900 leading-none mb-0.5">{bid.workerName}</h4>
+                        <div className="flex items-center gap-1 text-[9px] text-orange-500 font-black">
+                          <Star className="w-2.5 h-2.5 fill-orange-500" />
                           <span>{bid.workerRating?.toFixed(1) || '5.0'}</span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-gray-400 font-bold uppercase mb-0.5 leading-none">Budget</p>
-                      <p className="text-lg font-black text-blue-600 leading-none">Rp {bid.price.toLocaleString()}</p>
+                      <p className="text-[8px] text-gray-400 font-black uppercase mb-0.5 tracking-tighter leading-none">{bid.deliveryDays} Hari</p>
+                      <p className="text-base font-black text-blue-600 leading-none">Rp {bid.price.toLocaleString()}</p>
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-gray-500 mb-5 italic">"{bid.pitch}"</p>
+
+                  <p className="text-[11px] text-gray-500 mb-4 italic">"{bid.pitch}"</p>
 
                   {isClient && job.status === 'open' && (
-                    <button 
+                    <button
                       onClick={() => handleSelectWorker(bid)}
-                      className="w-full h-12 bg-gray-900 text-white rounded-2xl font-black text-sm hover:bg-blue-600 transition-colors"
+                      className="w-full h-10 bg-gray-900 text-white rounded-xl font-black text-xs hover:bg-blue-600 transition-colors uppercase tracking-widest"
                     >
-                      Pilih & Beresin 
+                      Pilih & Beresin
                     </button>
                   )}
 
                   {job.workerId === bid.workerId && (
-                    <div className="flex items-center justify-center gap-2 text-blue-600 font-black text-sm py-2">
-                      <CheckCircle className="w-4 h-4" />
+                    <div className="flex items-center justify-center gap-1.5 text-blue-600 font-black text-[11px] py-1">
+                      <CheckCircle className="w-3.5 h-3.5" />
                       <span>Terpilih!</span>
                     </div>
                   )}
