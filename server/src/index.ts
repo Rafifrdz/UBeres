@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { connectMongo, closeMongo } from './db/mongo';
 import jobsRouter from './routes/jobs';
 import authRouter from './routes/auth';
+import usersRouter from './routes/users';
 
 async function bootstrap() {
   await connectMongo();
@@ -24,6 +25,7 @@ async function bootstrap() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/users', usersRouter);
   app.use('/api/jobs', jobsRouter);
 
   const server = app.listen(env.apiPort, () => {

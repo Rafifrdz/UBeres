@@ -39,6 +39,8 @@ router.post('/google', async (req, res) => {
         displayName: name,
         photoURL: picture,
         role: role || 'client', // Use provided role or default
+        balance: 0,
+        escrow: 0,
         rating: 5.0,
         totalRatings: 0,
         createdAt: new Date(),

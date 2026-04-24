@@ -59,6 +59,7 @@ router.get('/', async (req, res) => {
   const category = String(req.query.category ?? '').trim();
   const q = String(req.query.q ?? '').trim();
   const clientId = String(req.query.clientId ?? '').trim();
+  const workerId = String(req.query.workerId ?? '').trim();
   const limit = Math.min(Number(req.query.limit ?? 50), 200);
 
   const filter: Record<string, unknown> = {};
@@ -71,6 +72,10 @@ router.get('/', async (req, res) => {
     filter.clientId = clientId;
   }
 
+  if (workerId) {
+    filter.workerId = workerId;
+  }
+
   if (category) {
     filter.category = category;
   }
@@ -79,12 +84,36 @@ router.get('/', async (req, res) => {
     filter.$or = [
       { title: { $regex: q, $options: 'i' } },
       { description: { $regex: q, $options: 'i' } },
+      { keywords: { $regex: q, $options: 'i' } },
     ];
   }
 
   const jobs = await db.collection('jobs').find(filter).sort({ createdAt: -1 }).limit(limit).toArray();
 
   res.json({ data: jobs.map((job) => toJobResponse(job as Record<string, unknown>)) });
+});
+
+router.get('/bids', async (req, res) => {
+  const db = await connectMongo();
+  const workerId = String(req.query.workerId ?? req.header('x-user-id') ?? '').trim();
+  const status = String(req.query.status ?? '').trim();
+
+  if (!workerId) {
+    return res.status(400).json({ error: 'workerId atau header x-user-id wajib diisi' });
+  }
+
+  const filter: Record<string, unknown> = { workerId };
+  if (status) {
+    filter.status = status;
+  }
+
+  const bids = await db
+    .collection('bids')
+    .find(filter)
+    .sort({ createdAt: -1 })
+    .toArray();
+
+  return res.json({ data: bids.map((bid) => toDocResponse(bid as Record<string, unknown>)) });
 });
 
 router.get('/:jobId', async (req, res) => {
@@ -113,6 +142,14 @@ router.post('/', async (req, res) => {
   const deadline = req.body?.deadline ? new Date(req.body.deadline) : null;
 
   const clientId = String(req.body?.clientId ?? req.header('x-user-id') ?? '').trim();
+  const clientName = String(req.body?.clientName ?? '').trim();
+  const clientPhotoURL = String(req.body?.clientPhotoURL ?? '').trim();
+  const keywordsStr = String(req.body?.keywords ?? '').trim();
+  const isAnonymous = Boolean(req.body?.isAnonymous);
+  const isFixedPrice = Boolean(req.body?.isFixedPrice);
+
+  // Convert "Skill 1, Skill 2" to ["Skill 1", "Skill 2"]
+  const keywords = keywordsStr.split(',').map(s => s.trim()).filter(s => s);
 
   if (!clientId) {
     return res.status(400).json({ error: 'clientId atau header x-user-id wajib diisi' });
@@ -138,6 +175,11 @@ router.post('/', async (req, res) => {
     budget,
     deadline,
     clientId,
+    clientName,
+    clientPhotoURL,
+    keywords,
+    isAnonymous,
+    isFixedPrice,
     workerId: null,
     status: 'open' as JobStatus,
     bidCount: 0,
@@ -215,6 +257,54 @@ router.patch('/:jobId/status', async (req, res) => {
 
   if (nextStatus === 'assigned') {
     updatePayload.workerId = workerId;
+    
+    // Ambil harga dari bid yang dipilih untuk jadi budget final
+    const bid = await db.collection('bids').findOne({ jobId, workerId });
+    if (bid && typeof bid.price === 'number') {
+      updatePayload.budget = bid.price;
+    }
+    
+    // Update bid statuses for this job
+    await db.collection('bids').updateMany(
+      { jobId, workerId: { $ne: workerId } },
+      { $set: { status: 'rejected' } }
+    );
+    await db.collection('bids').updateOne(
+      { jobId, workerId },
+      { $set: { status: 'accepted' } }
+    );
+  }
+
+  if (nextStatus === 'paid') {
+    // Client membayar, dana masuk ke escrow worker
+    const amount = existing.budget || 0;
+    await db.collection('users').updateOne(
+      { uid: currentClientId },
+      { $inc: { balance: -amount } }
+    );
+    await db.collection('users').updateOne(
+      { uid: currentWorkerId },
+      { $inc: { escrow: amount } }
+    );
+  }
+
+  if (nextStatus === 'completed') {
+    // Pekerjaan selesai, dana escrow worker cair ke balance
+    const amount = existing.budget || 0;
+    await db.collection('users').updateOne(
+      { uid: currentWorkerId },
+      { 
+        $inc: { escrow: -amount, balance: amount },
+        $push: { 
+          transactions: {
+            type: 'in',
+            title: `Hasil Jasa: ${existing.title}`,
+            amount: amount,
+            date: new Date()
+          } as any
+        }
+      }
+    );
   }
 
   await jobs.updateOne({ _id: new ObjectId(jobId) }, { $set: updatePayload });
@@ -263,11 +353,14 @@ router.post('/:jobId/bids', async (req, res) => {
   const now = new Date();
   const payload = {
     jobId,
+    jobTitle: resolved.job.title,
+    clientName: resolved.job.clientName,
     workerId: actorId,
     workerName,
     workerRating,
     price,
     pitch,
+    status: 'pending',
     createdAt: now,
   };
 
@@ -340,6 +433,80 @@ router.post('/:jobId/messages', async (req, res) => {
   const inserted = await resolved.db.collection('messages').insertOne(payload);
   const message = await resolved.db.collection('messages').findOne({ _id: inserted.insertedId });
   return res.status(201).json({ data: toDocResponse(message as Record<string, unknown>) });
+});
+
+router.get('/:jobId/reviews', async (req, res) => {
+  const { jobId } = req.params;
+  const db = getDb();
+  const reviews = await db.collection('reviews').find({ jobId }).toArray();
+  return res.json({ data: reviews });
+});
+
+router.post('/:jobId/review', async (req, res) => {
+  const { jobId } = req.params;
+  const resolved = await getJobOr404(jobId);
+  if ('error' in resolved) {
+    return res.status(resolved.error.status).json({ error: resolved.error.message });
+  }
+
+  const clientId = String(req.body?.clientId ?? req.header('x-user-id') ?? '').trim();
+  const workerId = String(resolved.job.workerId ?? '');
+  const rating = Number(req.body?.rating ?? 0);
+  const comment = String(req.body?.comment ?? '').trim();
+
+  if (!clientId || rating < 1 || rating > 5 || !workerId) {
+    return res.status(400).json({ error: 'Data review tidak valid' });
+  }
+
+  if (String(resolved.job.clientId) !== clientId) {
+    return res.status(403).json({ error: 'Hanya client yang bisa merating worker' });
+  }
+
+  const reviewsCollection = resolved.db.collection('reviews');
+  const existingReview = await reviewsCollection.findOne({ jobId, reviewerId: clientId });
+
+  if (existingReview) {
+    if (existingReview.edited) {
+      return res.status(400).json({ error: 'Kamu hanya bisa mengedit review 1 kali' });
+    }
+    
+    // Update existing review
+    await reviewsCollection.updateOne(
+      { _id: existingReview._id },
+      { 
+        $set: { 
+          rating, 
+          comment, 
+          edited: true, 
+          updatedAt: new Date() 
+        } 
+      }
+    );
+  } else {
+    // Create new review
+    await reviewsCollection.insertOne({
+      jobId,
+      reviewerId: clientId,
+      targetId: workerId,
+      rating,
+      comment,
+      edited: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+
+  // Recalculate worker rating
+  const allReviews = await reviewsCollection.find({ targetId: workerId }).toArray();
+  const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
+  const averageRating = totalRating / allReviews.length;
+
+  await resolved.db.collection('users').updateOne(
+    { uid: workerId },
+    { $set: { rating: averageRating, totalRatings: allReviews.length } }
+  );
+
+  return res.json({ message: 'Review berhasil disimpan' });
 });
 
 export default router;

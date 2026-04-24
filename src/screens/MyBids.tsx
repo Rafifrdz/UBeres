@@ -1,52 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { FileText, Clock, ChevronRight, CheckCircle2, XCircle, Search, Filter, Loader2, AlertCircle } from 'lucide-react';
-import { Job, UserProfile } from '../types';
+import { FileText, Clock, ChevronRight, Loader2 } from 'lucide-react';
+import { Bid, UserProfile } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface MyBidsProps {
   user: UserProfile;
   onJobClick: (id: string) => void;
 }
 
-// Mock data for bids since backend doesn't support worker-bid-lookup yet
-const mockBids = [
-  {
-    id: 'bid-1',
-    jobId: 'job-1',
-    jobTitle: 'Bantu Ngerjain Tugas Kalkulus 2',
-    clientName: 'Muhammad Rafi',
-    price: 50000,
-    status: 'pending', // pending, accepted, rejected
-    date: '24 Apr, 10:00'
-  },
-  {
-    id: 'bid-2',
-    jobId: 'job-2',
-    jobTitle: 'Desain Poster Event UKM',
-    clientName: 'Sarah Azhari',
-    price: 120000,
-    status: 'accepted',
-    date: '22 Apr, 15:30'
-  },
-  {
-    id: 'bid-3',
-    jobId: 'job-3',
-    jobTitle: 'Input Data Excel UMKM',
-    clientName: 'BEM FILKOM',
-    price: 30000,
-    status: 'rejected',
-    date: '20 Apr, 09:15'
-  }
-];
-
 export default function MyBids({ user, onJobClick }: MyBidsProps) {
-  const [loading, setLoading] = useState(false);
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'semua' | 'pending' | 'accepted'>('semua');
 
-  const filteredBids = mockBids.filter(bid => {
+  useEffect(() => {
+    let mounted = true;
+
+    const loadBids = async () => {
+      try {
+        setLoading(true);
+        const response = await apiFetch<{ data: Bid[] }>(`/jobs/bids?workerId=${user.uid}`);
+        if (mounted) {
+          setBids(response.data || []);
+        }
+      } catch (error: any) {
+        console.error('MyBids fetch error:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadBids();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user.uid]);
+
+  const filteredBids = bids.filter(bid => {
     if (activeTab === 'semua') return true;
     return bid.status === activeTab;
   });
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', { 
+      day: 'numeric', 
+      month: 'short', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden h-full">
@@ -112,9 +120,9 @@ export default function MyBids({ user, onJobClick }: MyBidsProps) {
                       {bid.status === 'accepted' ? 'Diterima' :
                        bid.status === 'rejected' ? 'Ditolak' : 'Menunggu'}
                     </span>
-                    <span className="text-[9px] text-gray-300 font-bold">{bid.date}</span>
+                    <span className="text-[9px] text-gray-300 font-bold">{formatDate(bid.createdAt)}</span>
                   </div>
-                  <h3 className="text-sm font-black text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{bid.jobTitle}</h3>
+                  <h3 className="text-sm font-black text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{bid.jobTitle || 'Judul Kerjaan'}</h3>
                 </div>
                 <div className="text-right">
                   <p className="text-[8px] text-gray-400 font-black uppercase mb-0.5 leading-none">Tawaranmu</p>
@@ -125,9 +133,9 @@ export default function MyBids({ user, onJobClick }: MyBidsProps) {
               <div className="flex items-center justify-between pt-4 border-t border-gray-50">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px] font-black text-blue-500">
-                    {bid.clientName[0]}
+                    {(bid.clientName || 'U')[0]}
                   </div>
-                  <p className="text-[10px] text-gray-500 font-bold">{bid.clientName}</p>
+                  <p className="text-[10px] text-gray-500 font-bold">{bid.clientName || 'User UBeres'}</p>
                 </div>
                 <div className="flex items-center gap-1 text-blue-500">
                   <span className="text-[9px] font-black uppercase tracking-widest">Lihat Detail</span>

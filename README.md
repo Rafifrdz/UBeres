@@ -1,51 +1,42 @@
+# UBeres - Beresin Tugas Kampus Gampang!
 
-# UBeres - Beresno Tugas Kampus Gampang!
+Aplikasi buat bantu mahasiswa UB beresin tugas kampus. Ada yang jadi **Worker** (si tukang beres) dan ada yang jadi **Client** (si minta tolong).
 
-Aplikasi iki kanggo mbantu mahasiswa UB beresno tugas kampus. Ana sing dadi **Worker** (sing ngerjake tugas) lan ana sing dadi **Client** (sing njaluk tulung).
+## 🚀 Cara Gas (Buat Rafi)
 
-## 🚀 Cara Nglakokno (Kanggo Rafi)
+Biar aplikasinya jalan di laptop lu, ikutin step simpel ini:
 
-Supaya aplikasine iso mlaku neng laptopmu, turuti langkah-langkah iki:
-
-### 1. Install Disik Bro
-
-Bukak terminal neng root folder, terus ketik command iki:
-
+### 1. Install Dulu Bro
+Buka terminal di root folder, terus hajar command ini:
 ```bash
 npm install
 cd server && npm install && cd ..
 ```
 
 ### 2. Isi "Bahan Bakar" (.env)
+Lu perlu file `.env` di root folder. Copy aja dari `.env.example`, terus isinya jangan lupa:
+- `MONGODB_URI`: Link database MongoDB.
+- `GOOGLE_CLIENT_ID`: ID buat login Google.
+- `VITE_GOOGLE_CLIENT_ID`: Sama aja kayak yang di atas.
 
-Kowe butuh file `.env` neng root folder. Tinggal copy wae saka `.env.example`, terus diisi iki:
+> **PENTING:** Database udah ada isinya, jadi lu tinggal pake aja. Kalau butuh API atau ID Google-nya, **chat Kahfi** aja ya.
 
-* `MONGODB_URI`: Link database MongoDB.
-* `GOOGLE_CLIENT_ID`: ID kanggo login Google.
-* `VITE_GOOGLE_CLIENT_ID`: Podho wae karo sing ndhuwur.
+### 3. Jalanin Aplikasinya
+Buka dua terminal biar enak:
 
-> **PENTING:** Database wis ono isine, dadi kowe tinggal nganggo wae. Nek butuh API utawa ID Google, langsung **chat Kahfi** wae yo.
-
-### 3. Nglakokno Aplikasine
-
-Bukak loro terminal ben luwih penak:
-
-**Terminal 1 (Kanggo Backend):**
-
+**Terminal 1 (Buat Backend):**
 ```bash
 npm run server:dev
 ```
 
-**Terminal 2 (Kanggo Frontend):**
-
+**Terminal 2 (Buat Frontend):**
 ```bash
 npm run dev
 ```
 
-Wis ngono wae, nek ono error utawa bingung, takokno Kahfi yo!
+Udah gitu aja, kalau ada error atau bingung, tanya Kahfi ya!
 
 ---
 
 ## 📞 Info API
-
-Butuh API Key Gemini, link MongoDB, utawa Google Client ID? Langsung **PC Kahfi** wae, ojo sungkan.
+Butuh API Key Gemini, link MongoDB, atau Google Client ID? Langsung **PC Kahfi** aja, jangan malu-malu.

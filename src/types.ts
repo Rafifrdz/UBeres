@@ -8,8 +8,12 @@ export interface UserProfile {
   role: UserRole;
   rating?: number;
   totalRatings?: number;
+  balance?: number;
+  escrow?: number;
   bio?: string;
-  portfolio?: string[];
+  skills?: string[];
+  portfolio?: any[];
+  transactions?: any[];
   createdAt: any;
 }
 
@@ -36,12 +40,15 @@ export interface Job {
 export interface Bid {
   id: string;
   jobId: string;
+  jobTitle?: string;
+  clientName?: string;
   workerId: string;
   workerName: string;
   workerRating?: number;
   price: number;
   deliveryDays: number;
   pitch: string;
+  status: 'pending' | 'accepted' | 'rejected';
   createdAt: any;
 }
 
