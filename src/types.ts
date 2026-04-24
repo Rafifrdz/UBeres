@@ -34,6 +34,7 @@ export interface Job {
   bidCount: number;
   isFixedPrice?: boolean;
   isAnonymous?: boolean;
+  images?: string[];
   createdAt: any;
   updatedAt: any;
 }

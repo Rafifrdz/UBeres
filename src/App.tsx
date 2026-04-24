@@ -26,6 +26,7 @@ import { SubmitResult } from './screens-new/SubmitResult';
 import { PublicProfile } from './screens-new/PublicProfile';
 import { TopUp } from './screens-new/TopUp';
 import { Withdraw } from './screens-new/Withdraw';
+import { TopWorkers } from './screens-new/TopWorkers';
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
               {/* Main App */}
               <Route path="/feed" element={<Feed />} />
               <Route path="/explore" element={<Explore />} />
+              <Route path="/top-workers" element={<TopWorkers />} />
               <Route path="/job/:id" element={<JobDetail />} />
               <Route path="/my-jobs" element={<MyJobs />} />
               <Route path="/my-posts" element={<MyPosts />} />

@@ -88,7 +88,13 @@ router.get('/', async (req, res) => {
     ];
   }
 
-  const jobs = await db.collection('jobs').find(filter).sort({ createdAt: -1 }).limit(limit).toArray();
+  const sortParam = String(req.query.sort ?? '');
+  let sort: Record<string, any> = { createdAt: -1 };
+  if (sortParam === 'trending') {
+    sort = { bidCount: -1, createdAt: -1 };
+  }
+
+  const jobs = await db.collection('jobs').find(filter).sort(sort).limit(limit).toArray();
 
   res.json({ data: jobs.map((job) => toJobResponse(job as Record<string, unknown>)) });
 });
@@ -148,6 +154,7 @@ router.post('/', async (req, res) => {
   const keywordsStr = String(req.body?.keywords ?? '').trim();
   const isAnonymous = Boolean(req.body?.isAnonymous);
   const isFixedPrice = Boolean(req.body?.isFixedPrice);
+  const images = Array.isArray(req.body?.images) ? req.body.images : [];
 
   // Convert "Skill 1, Skill 2" to ["Skill 1", "Skill 2"]
   const keywords = keywordsStr.split(',').map(s => s.trim()).filter(s => s);
@@ -184,6 +191,7 @@ router.post('/', async (req, res) => {
     workerId: null,
     status: 'open' as JobStatus,
     bidCount: 0,
+    images,
     createdAt: now,
     updatedAt: now,
   };

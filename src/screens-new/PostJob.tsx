@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../lib/api';
-import { generateId, categoryColors } from '../utils-new/storage';
+import { categoryColors } from '../utils-new/storage';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, Sparkles, Calendar } from 'lucide-react';
+import { ArrowLeft, Sparkles, Calendar, X, Plus } from 'lucide-react';
 
 const CATEGORIES = ['Umum', 'Coding', 'Penulisan', 'Desain', 'Bahasa'];
 const BUDGET_SUGGESTIONS = [50000, 100000, 150000, 200000, 300000];
@@ -21,6 +21,8 @@ export function PostJob() {
   const [deadline, setDeadline] = useState('');
   const [agreeEthics, setAgreeEthics] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleSubmit = async () => {
     if (!user || !title || !category || !description || !budget || !deadline || !agreeEthics) {
@@ -29,6 +31,37 @@ export function PostJob() {
     }
 
     try {
+      setIsUploading(true);
+      let imageUrls: string[] = [];
+
+      if (selectedFiles.length > 0) {
+        showToast('Sedang mengupload gambar...', 'info');
+        
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          throw new Error('Cloudinary config missing di .env');
+        }
+
+        imageUrls = await Promise.all(
+          selectedFiles.map(async (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
+            
+            const res = await fetch(
+              `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+              { method: 'POST', body: formData }
+            );
+            
+            if (!res.ok) throw new Error('Gagal upload ke Cloudinary');
+            const data = await res.json();
+            return data.secure_url;
+          })
+        );
+      }
+
       const response = await apiFetch<{ data: any }>('/jobs', {
         method: 'POST',
         body: JSON.stringify({
@@ -38,6 +71,7 @@ export function PostJob() {
           budget: parseInt(budget),
           deadline: new Date(deadline).toISOString(),
           isAnonymous,
+          images: imageUrls,
           clientId: user.uid,
           clientName: user.displayName,
           clientPhotoURL: user.photoURL,
@@ -49,6 +83,8 @@ export function PostJob() {
     } catch (error: any) {
       console.error('Failed to post job:', error);
       showToast(error.message || 'Gagal mempublikasikan tugas', 'error');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -66,7 +102,7 @@ export function PostJob() {
     <div className="min-h-screen bg-[#F8F9FB] pb-8">
       {/* Header */}
       <div className="bg-white px-6 py-4 flex items-center gap-4 sticky top-0 z-10 border-b border-gray-100 mb-6">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-gray-100 rounded-full">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </button>
         <div className="flex-1">
@@ -81,7 +117,7 @@ export function PostJob() {
           {[1, 2, 3].map(i => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-gray-900' : 'bg-gray-200'}`}
+              className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-[#6366f2]' : 'bg-gray-200'}`}
             />
           ))}
         </div>
@@ -113,7 +149,7 @@ export function PostJob() {
                     onClick={() => setCategory(cat)}
                     className={`px-4 py-3 rounded-[10px] text-sm font-medium transition-all ${
                       category === cat
-                        ? `${categoryColors[cat]} border-2 border-current`
+                        ? 'bg-[#6366f2]/10 border-2 border-[#6366f2] text-[#6366f2]'
                         : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                   >
@@ -142,10 +178,53 @@ export function PostJob() {
               />
             </div>
 
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Lampiran Gambar (Opsional)
+                </label>
+                <span className="text-xs text-gray-400">{selectedFiles.length} / 3</span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {selectedFiles.map((file, i) => (
+                  <div key={i} className="relative aspect-square rounded-[12px] overflow-hidden border border-gray-200">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-black/70 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {selectedFiles.length < 3 && (
+                  <label className="aspect-square rounded-[12px] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
+                    <Plus className="w-6 h-6 text-gray-400" />
+                    <span className="text-[10px] text-gray-400 mt-1">Upload</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={e => {
+                        const files = Array.from(e.target.files || []);
+                        setSelectedFiles(prev => [...prev, ...files].slice(0, 3));
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">Maksimal 3 foto, ukuran per foto max 2MB</p>
+            </div>
+
             <button
               onClick={() => setStep(2)}
               disabled={!canProceedStep1}
-              className="w-full bg-gray-900 text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50"
+              className="w-full bg-[#6366f2] text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50"
             >
               Lanjut
             </button>
@@ -208,7 +287,7 @@ export function PostJob() {
               <button
                 onClick={() => setStep(3)}
                 disabled={!canProceedStep2}
-                className="flex-1 bg-gray-900 text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50"
+                className="flex-1 bg-[#6366f2] text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50"
               >
                 Lanjut
               </button>
@@ -219,7 +298,6 @@ export function PostJob() {
         {/* Step 3: Preview & Confirm */}
         {step === 3 && (
           <div className="space-y-6">
-            {/* Preview Card */}
             <div className="bg-white rounded-[16px] p-4 shadow-sm">
               <h3 className="font-semibold text-gray-900 mb-3">Preview</h3>
 
@@ -238,6 +316,18 @@ export function PostJob() {
                   <p className="text-xs text-gray-500 mb-1">Deskripsi</p>
                   <p className="text-sm text-gray-700">{description}</p>
                 </div>
+                {selectedFiles.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Lampiran</p>
+                    <div className="flex gap-2">
+                      {selectedFiles.map((file, i) => (
+                        <div key={i} className="w-12 h-12 rounded-[8px] overflow-hidden border border-gray-100">
+                          <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Budget</p>
@@ -287,10 +377,11 @@ export function PostJob() {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!canSubmit}
-                className="flex-1 bg-gray-900 text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50"
+                disabled={!canSubmit || isUploading}
+                className="flex-1 bg-[#6366f2] text-white rounded-[10px] py-4 font-medium hover:bg-[#4F46E5] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Publikasikan
+                {isUploading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {isUploading ? 'Mengupload...' : 'Publikasikan'}
               </button>
             </div>
           </div>

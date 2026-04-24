@@ -6,6 +6,7 @@ import { Job } from '../types';
 import { JobCard } from '../components/JobCard';
 import { JobCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { Loading } from '../components/Loading';
 import { BottomNav } from '../components/BottomNav';
 import { Search, Plus, Briefcase } from 'lucide-react';
 
@@ -80,7 +81,7 @@ export function Feed() {
   return (
     <div className="min-h-screen bg-[#F8F9FB] pb-20">
       {/* Header */}
-      <div className="bg-white px-5 pt-6 pb-5 mb-4 shadow-sm">
+      <div className="bg-white px-5 pt-6 pb-5 mb-4 shadow-sm sticky top-0 z-10">
         <div className="flex items-center justify-between mb-5">
           <div>
             <p className="text-sm text-gray-500 mb-0.5">{getGreeting()},</p>
@@ -126,16 +127,14 @@ export function Feed() {
       {/* Job List */}
       <div className="px-5">
         {isRefreshing && (
-          <div className="text-center py-4">
-            <div className="inline-block w-6 h-6 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+          <div className="flex justify-center py-4">
+            <Loading size="sm" label="" />
           </div>
         )}
 
         {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <JobCardSkeleton key={i} />
-            ))}
+          <div className="py-20">
+            <Loading label="Mencari tugas terbaik untukmu..." />
           </div>
         ) : filteredJobs.length === 0 ? (
           <EmptyState

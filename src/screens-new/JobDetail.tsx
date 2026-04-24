@@ -4,8 +4,9 @@ import { useApp } from '../context/AppContext';
 import { apiFetch } from '../lib/api';
 import { Job, Bid } from '../types';
 import { BottomSheet } from '../components/BottomSheet';
+import { Loading } from '../components/Loading';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, Calendar, DollarSign, Tag, Users, Sparkles, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, DollarSign, Tag, Users, Sparkles, MessageCircle, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 
@@ -38,6 +39,8 @@ export function JobDetail() {
   const [bidAmount, setBidAmount] = useState('');
   const [bidPitch, setBidPitch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -107,8 +110,8 @@ export function JobDetail() {
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
-        <p className="text-gray-500">Job tidak ditemukan</p>
+      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-6">
+        <Loading label="Mengambil detail tugas..." />
       </div>
     );
   }
@@ -212,6 +215,28 @@ export function JobDetail() {
           <h3 className="font-semibold text-gray-900 mb-2">Deskripsi</h3>
           <p className="text-gray-700 whitespace-pre-wrap">{job.description}</p>
         </div>
+
+        {/* Images */}
+        {job.images && job.images.length > 0 && (
+          <div className="bg-white rounded-[16px] p-4 shadow-sm">
+            <h3 className="font-semibold text-gray-900 mb-3">Lampiran Gambar</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {job.images.map((img, i) => (
+                <div 
+                  key={i} 
+                  className="aspect-square rounded-[12px] overflow-hidden border border-gray-100 cursor-pointer"
+                  onClick={() => setSelectedImage(img)}
+                >
+                  <img 
+                    src={img} 
+                    alt={`Lampiran ${i + 1}`} 
+                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" 
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bids List */}
         {bids.length > 0 && (
@@ -322,6 +347,30 @@ export function JobDetail() {
           </div>
         </div>
       </BottomSheet>
+
+      {/* Image Preview Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-6"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedImage(null);
+            }}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={selectedImage} 
+            alt="Preview Full" 
+            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
