@@ -137,7 +137,8 @@ router.post('/', async (req, res) => {
 
   const title = String(req.body?.title ?? '').trim();
   const description = String(req.body?.description ?? '').trim();
-  const category = String(req.body?.category ?? 'Tugas').trim();
+  let category = String(req.body?.category ?? '').trim();
+  if (!category) category = 'Umum';
   const budget = Number(req.body?.budget ?? 0);
   const deadline = req.body?.deadline ? new Date(req.body.deadline) : null;
 

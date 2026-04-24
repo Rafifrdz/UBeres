@@ -33,6 +33,7 @@ export interface Job {
   status: JobStatus;
   bidCount: number;
   isFixedPrice?: boolean;
+  isAnonymous?: boolean;
   createdAt: any;
   updatedAt: any;
 }

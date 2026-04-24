@@ -31,8 +31,10 @@ router.post('/google', async (req, res) => {
 
     // Find or create user
     let user = await usersCollection.findOne({ uid });
+    let isNewUser = false;
 
     if (!user) {
+      isNewUser = true;
       user = {
         uid,
         email,
@@ -48,7 +50,7 @@ router.post('/google', async (req, res) => {
       await usersCollection.insertOne(user);
     }
 
-    res.json({ user });
+    res.json({ user, isNewUser });
   } catch (error) {
     console.error('Google Auth Error:', error);
     res.status(401).json({ error: 'Authentication failed' });

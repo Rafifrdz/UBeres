@@ -3,6 +3,20 @@ import { getDb } from '../db/mongo';
 
 const router = Router();
 
+// Get Top Workers
+router.get('/top-workers', async (req, res) => {
+  const db = getDb();
+  const limit = Math.min(Number(req.query.limit ?? 5), 20);
+  
+  const workers = await db.collection('users')
+    .find({ role: 'worker' })
+    .sort({ rating: -1, totalRatings: -1 })
+    .limit(limit)
+    .toArray();
+
+  res.json({ data: workers });
+});
+
 // Get User Profile & Wallet
 router.get('/:uid', async (req, res) => {
   const { uid } = req.params;
