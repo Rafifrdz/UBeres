@@ -1,284 +1,188 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { storage, generateId } from '../utils-new/storage';
-import { BottomNav } from '../components/BottomNav';
-import { EmptyState } from '../components/EmptyState';
-import { MessageCircle, Search, Pin, MoreVertical } from 'lucide-react';
-import { formatDistanceToNow, isToday, isYesterday, format } from 'date-fns';
-import { id as localeId } from 'date-fns/locale';
+import { apiFetch } from '../lib/api';
+import { io, Socket } from 'socket.io-client';
+import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, ShieldCheck, Clock } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+
+interface Message {
+  id?: string;
+  jobId: string;
+  senderId: string;
+  text: string;
+  createdAt: any;
+}
 
 export function Chat() {
-  const navigate = useNavigate();
+  const { jobId } = useParams();
   const { user } = useApp();
-  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [jobInfo, setJobInfo] = useState<any>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Create mock chat jobs for testing if user has no chats
+  // Initialize Socket
   useEffect(() => {
-    if (!user) return;
+    const newSocket = io('http://localhost:8080'); // Sesuaikan dengan URL server
+    setSocket(newSocket);
 
-    const allJobs = storage.getJobs();
-    const userJobs = user.role === 'client'
-      ? allJobs.filter(j => j.clientId === user.uid && j.workerId)
-      : allJobs.filter(j => j.workerId === user.uid);
-
-    // If no chats exist, create mock ones
-    if (userJobs.length === 0) {
-      const mockWorkerId = 'mock_worker_' + Date.now();
-      const mockClientId = 'mock_client_' + Date.now();
-
-      const mockJob1 = {
-        id: 'chat_job_1_' + generateId(),
-        title: 'Desain Logo untuk Startup Edutech',
-        description: 'Butuh desain logo modern untuk aplikasi edukasi. Prefer warna biru/hijau.',
-        category: 'Desain',
-        budget: 150000,
-        deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'working' as const,
-        clientId: user.role === 'client' ? user.uid : mockClientId,
-        workerId: user.role === 'worker' ? user.uid : mockWorkerId,
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        bidCount: 5,
-      };
-
-      const mockJob2 = {
-        id: 'chat_job_2_' + generateId(),
-        title: 'Translate Paper Bahasa Inggris ke Indonesia',
-        description: 'Paper tentang machine learning, 15 halaman.',
-        category: 'Bahasa',
-        budget: 200000,
-        deadline: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'working' as const,
-        clientId: user.role === 'client' ? user.uid : mockClientId,
-        workerId: user.role === 'worker' ? user.uid : mockWorkerId,
-        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-        bidCount: 3,
-      };
-
-      storage.addJob(mockJob1);
-      storage.addJob(mockJob2);
-
-      // Add mock messages
-      const otherUserId1 = user.role === 'client' ? mockJob1.workerId : mockJob1.clientId;
-      const otherUserId2 = user.role === 'client' ? mockJob2.workerId : mockJob2.clientId;
-
-      const mockMessages1 = [
-        {
-          id: generateId(),
-          jobId: mockJob1.id,
-          senderId: otherUserId1!,
-          content: 'Halo! Terima kasih sudah pilih bid saya. Saya sudah mulai riset untuk logo-nya',
-          type: 'text' as const,
-          createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId: mockJob1.id,
-          senderId: 'system',
-          content: 'Bid telah diterima. Status: Dikerjakan',
-          type: 'system' as const,
-          createdAt: new Date(Date.now() - 35 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId: mockJob1.id,
-          senderId: user.uid,
-          content: 'Oke siap! Kalau butuh info tambahan bisa tanya ya',
-          type: 'text' as const,
-          createdAt: new Date(Date.now() - 34 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId: mockJob1.id,
-          senderId: otherUserId1!,
-          content: 'Draft_Logo_v1.pdf',
-          type: 'file' as const,
-          fileUrl: 'https://example.com/draft1.pdf',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-
-      const mockMessages2 = [
-        {
-          id: generateId(),
-          jobId: mockJob2.id,
-          senderId: otherUserId2!,
-          content: 'Hai! Saya sudah download paper-nya. Kira-kira ada istilah khusus yang perlu saya perhatikan?',
-          type: 'text' as const,
-          createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId: mockJob2.id,
-          senderId: 'system',
-          content: 'Bid telah diterima. Status: Dikerjakan',
-          type: 'system' as const,
-          createdAt: new Date(Date.now() - 19 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId: mockJob2.id,
-          senderId: user.uid,
-          content: 'Untuk istilah ML kayak "neural network" pakai istilah baku aja ya',
-          type: 'text' as const,
-          createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-
-      mockMessages1.forEach(msg => storage.addMessage(msg));
-      mockMessages2.forEach(msg => storage.addMessage(msg));
+    if (jobId) {
+      newSocket.emit('join_room', jobId);
     }
-  }, [user]);
 
-  // Get user's jobs and create chat items
-  const allJobs = storage.getJobs();
-  const userJobs = user?.role === 'client'
-    ? allJobs.filter(j => j.clientId === user.uid && j.workerId)
-    : allJobs.filter(j => j.workerId === user?.uid);
+    newSocket.on('receive_message', (message: Message) => {
+      setMessages((prev) => [...prev, message]);
+    });
 
-  const chats = userJobs.map(job => {
-    const messages = storage.getMessages(job.id);
-    const lastMessage = messages[messages.length - 1];
-    const unreadCount = messages.filter(m =>
-      m.senderId !== user?.uid &&
-      new Date(m.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000
-    ).length;
-
-    return {
-      id: job.id,
-      jobTitle: job.title,
-      otherUserId: user?.role === 'client' ? job.workerId : job.clientId,
-      lastMessage: lastMessage?.content || 'Belum ada pesan',
-      lastMessageTime: lastMessage?.createdAt || job.createdAt,
-      lastMessageType: lastMessage?.type || 'text',
-      unread: unreadCount,
-      isPinned: false,
-      isOnline: Math.random() > 0.5, // Mock online status
+    return () => {
+      newSocket.close();
     };
-  });
+  }, [jobId]);
 
-  const filteredChats = chats.filter(chat =>
-    searchQuery
-      ? chat.jobTitle.toLowerCase().includes(searchQuery.toLowerCase())
-      : true
-  );
+  // Load History & Job Info
+  useEffect(() => {
+    if (jobId && user) {
+      // Get Job Info
+      apiFetch<any>(`/jobs/${jobId}`)
+        .then(res => setJobInfo(res.data))
+        .catch(err => console.error('Failed to load job:', err));
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    if (isToday(date)) {
-      return format(date, 'HH:mm');
-    } else if (isYesterday(date)) {
-      return 'Kemarin';
-    } else {
-      return format(date, 'd MMM');
+      // Get History
+      apiFetch<{ data: Message[] }>(`/jobs/${jobId}/messages?actorId=${user.uid}`)
+        .then(res => setMessages(res.data || []))
+        .catch(err => console.error('Failed to load messages:', err));
     }
+  }, [jobId, user]);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!newMessage.trim() || !socket || !user || !jobId) return;
+
+    const messageData = {
+      jobId,
+      senderId: user.uid,
+      text: newMessage,
+    };
+
+    socket.emit('send_message', messageData);
+    setNewMessage('');
   };
 
-  return (
-    <div className="min-h-screen bg-[#F8F9FB] pb-20">
-      {/* Header */}
-      <div className="bg-white px-6 pt-6 pb-4 shadow-sm sticky top-0 z-10">
-        <h1 className="text-2xl font-bold mb-4">Chat</h1>
+  const otherPartyName = user?.role === 'client' ? jobInfo?.workerName || 'Worker' : jobInfo?.clientName || 'Client';
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+  return (
+    <div className="flex flex-col h-screen bg-[#F8F9FB] overflow-hidden">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 z-20 shadow-sm">
+        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        </button>
+        
+        <div className="flex-1 flex items-center gap-3">
+          <div className="relative">
+            <img 
+              src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${otherPartyName}`}
+              className="w-10 h-10 rounded-full border-2 border-gray-50"
+              alt="Avatar"
+            />
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+          </div>
+          <div>
+            <h2 className="font-bold text-sm text-gray-900 leading-tight">{otherPartyName}</h2>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-500 font-medium truncate max-w-[150px]">
+                {jobInfo?.title || 'Memuat tugas...'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <MoreVertical className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+
+      {/* Escrow Banner */}
+      <div className="bg-blue-50/50 px-4 py-2 flex items-center justify-center gap-2 border-b border-blue-100/30">
+        <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+        <span className="text-[10px] text-blue-600 font-medium">Pembayaran aman melalui sistem Escrow UBeres</span>
+      </div>
+
+      {/* Chat Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+        {messages.map((msg, index) => {
+          const isMe = msg.senderId === user?.uid;
+          const showTime = index === 0 || 
+            new Date(msg.createdAt).getTime() - new Date(messages[index-1].createdAt).getTime() > 300000;
+
+          return (
+            <div key={index} className="space-y-2">
+              {showTime && (
+                <div className="flex justify-center my-4">
+                  <span className="bg-gray-200/50 text-gray-500 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                    {format(new Date(msg.createdAt), 'HH:mm', { locale: id })}
+                  </span>
+                </div>
+              )}
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+              >
+                <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm relative ${
+                  isMe 
+                    ? 'bg-[#6366F1] text-white rounded-tr-none' 
+                    : 'bg-white text-gray-800 rounded-tl-none border border-gray-50'
+                }`}>
+                  <p className="text-[13px] leading-relaxed">{msg.text}</p>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })}
+        <div ref={scrollRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="bg-white border-t border-gray-100 p-4 pb-8 md:pb-4">
+        <div className="flex items-center gap-2 bg-gray-50 rounded-2xl px-4 py-2 border border-gray-100 focus-within:border-blue-300 focus-within:bg-white transition-all">
+          <button className="text-gray-400 hover:text-blue-500 transition-colors">
+            <ImageIcon className="w-5 h-5" />
+          </button>
           <input
             type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Cari chat..."
-            className="w-full bg-[#F8F9FB] rounded-[12px] pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#6366F1] placeholder:text-gray-400"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Ketik pesan..."
+            className="flex-1 bg-transparent border-none focus:outline-none text-sm py-2"
           />
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={handleSend}
+            disabled={!newMessage.trim()}
+            className={`p-2 rounded-xl transition-all ${
+              newMessage.trim() 
+                ? 'bg-[#6366F1] text-white shadow-lg shadow-blue-200' 
+                : 'text-gray-300'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+          </motion.button>
         </div>
+        <p className="text-[10px] text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
+          <Clock className="w-3 h-3" /> Aktif hari ini • Enkripsi ujung ke ujung
+        </p>
       </div>
-
-      {/* Chat List */}
-      <div className="px-4 pt-2">
-        {filteredChats.length === 0 ? (
-          <EmptyState
-            icon={<MessageCircle className="w-16 h-16" />}
-            title={searchQuery ? 'Chat tidak ditemukan' : 'Belum ada chat'}
-            description={
-              searchQuery
-                ? 'Coba kata kunci lain'
-                : 'Chat akan muncul setelah kamu terima bid atau bid kamu diterima'
-            }
-          />
-        ) : (
-          <div className="space-y-1">
-            {filteredChats.map(chat => (
-              <div
-                key={chat.id}
-                onClick={() => navigate(`/chat/${chat.id}`)}
-                className="bg-white rounded-[16px] p-4 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all active:scale-[0.99]"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Avatar with online indicator */}
-                  <div className="relative flex-shrink-0">
-                    <img
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.otherUserId}`}
-                      alt="User"
-                      className="w-14 h-14 rounded-full"
-                    />
-                    {chat.isOnline && (
-                      <div className="absolute bottom-0 right-0 w-4 h-4 bg-[#6366F1] border-2 border-white rounded-full" />
-                    )}
-                    {chat.unread > 0 && (
-                      <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-[#6366F1] text-white text-xs rounded-full flex items-center justify-center px-1.5 font-medium">
-                        {chat.unread > 9 ? '9+' : chat.unread}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-1">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <h3 className={`font-semibold truncate ${
-                          chat.unread > 0 ? 'text-[#6366F1]' : 'text-[#818CF8]'
-                        }`}>
-                          {user?.role === 'client' ? 'Worker' : 'Client'} UB
-                        </h3>
-                        {chat.isPinned && (
-                          <Pin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                        {formatTime(chat.lastMessageTime)}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-gray-500 mb-1.5 truncate">{chat.jobTitle}</p>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <p className={`text-sm truncate flex-1 ${
-                        chat.unread > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'
-                      }`}>
-                        {chat.lastMessageType === 'file' && '📎 '}
-                        {chat.lastMessageType === 'system' && '🔔 '}
-                        {chat.lastMessage}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Options */}
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
-                  >
-                    <MoreVertical className="w-4 h-4 text-gray-400" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <BottomNav />
     </div>
   );
 }

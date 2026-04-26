@@ -11,12 +11,16 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "mongo:setup": "tsx scripts/setup-mongodb.ts"
+    "mongo:setup": "tsx scripts/setup-mongodb.ts",
+    "test:ai": "tsx scripts/test-ai.ts",
+    "test:ai-all": "tsx scripts/update-all-jobs-ai.ts"
   },
   "dependencies": {
     "@dotlottie/react-player": "^1.6.19",
     "@google/genai": "^1.29.0",
+    "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.10",
+    "@huggingface/inference": "^2.8.1",
     "@lottiefiles/dotlottie-react": "^0.19.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -62,6 +66,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.14.2",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",

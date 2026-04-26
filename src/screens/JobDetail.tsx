@@ -162,7 +162,9 @@ export default function JobDetail({ jobId, user, onBack, onChat }: JobDetailProp
   }
 
   const isClient = job.clientId === user.uid;
-  const isWorker = user.role === 'worker' && !isClient;
+  const isWorker = user.role === 'worker';
+  
+  // Debug: console.log('Current User UID:', user.uid, 'Job Client ID:', job.clientId, 'isClient:', isClient);
   const hasBid = bids.some(b => b.workerId === user.uid);
   const isAssigned = !!job.workerId;
   const isSelectedWorker = job.workerId === user.uid;

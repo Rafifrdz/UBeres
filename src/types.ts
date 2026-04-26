@@ -35,6 +35,7 @@ export interface Job {
   isFixedPrice?: boolean;
   isAnonymous?: boolean;
   images?: string[];
+  aiInsight?: string;
   createdAt: any;
   updatedAt: any;
 }

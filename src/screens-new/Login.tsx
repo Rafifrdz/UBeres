@@ -66,7 +66,7 @@ export function Login() {
             Gunakan email UB untuk login
           </p>
 
-          <div className="flex justify-center">
+          <div className="flex flex-col gap-4 justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => alert('Login Google Gagal')}
@@ -75,6 +75,22 @@ export function Login() {
               size="large"
               width="100%"
             />
+
+            {/* Tombol Rahasia buat Test di HP (Bypass Google) */}
+            <button
+              onClick={() => {
+                login({
+                  uid: 'tester-123',
+                  displayName: 'Tester Mobile',
+                  email: 'tester@student.ub.ac.id',
+                  role: 'client'
+                });
+                navigate('/feed');
+              }}
+              className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-medium text-sm transition-colors border border-gray-200"
+            >
+              Login sebagai Tester (Mode HP)
+            </button>
           </div>
 
           <p className="text-xs text-gray-500 text-center mt-6 leading-relaxed">

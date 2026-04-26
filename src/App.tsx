@@ -17,7 +17,7 @@ import { PostJob } from './screens-new/PostJob';
 import { Profile } from './screens-new/Profile';
 import { EditProfile } from './screens-new/EditProfile';
 import { Settings } from './screens-new/Settings';
-import { Chat } from './screens-new/Chat';
+import { ChatList } from './screens-new/ChatList';
 import { ChatDetail } from './screens-new/ChatDetail';
 import { Notifications } from './screens-new/Notifications';
 import { Rating } from './screens-new/Rating';
@@ -33,7 +33,7 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <AppProvider>
-          <div className="min-h-screen bg-[#F8F9FB] max-w-[430px] mx-auto relative overflow-x-hidden shadow-2xl border-x border-gray-100">
+          <div className="min-h-screen bg-[#F8F9FB] max-w-[430px] mx-auto relative shadow-2xl border-x border-gray-100">
             <Routes>
               {/* Auth Flow */}
               <Route path="/" element={<Splash />} />
@@ -49,7 +49,7 @@ export default function App() {
               <Route path="/my-jobs" element={<MyJobs />} />
               <Route path="/my-posts" element={<MyPosts />} />
               <Route path="/post-job" element={<PostJob />} />
-              <Route path="/chat" element={<Chat />} />
+              <Route path="/chat" element={<ChatList />} />
               <Route path="/chat/:jobId" element={<ChatDetail />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<PublicProfile />} />

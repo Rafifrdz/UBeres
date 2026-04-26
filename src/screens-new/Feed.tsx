@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { apiFetch } from '../lib/api';
@@ -9,6 +9,7 @@ import { EmptyState } from '../components/EmptyState';
 import { Loading } from '../components/Loading';
 import { BottomNav } from '../components/BottomNav';
 import { Search, Plus, Briefcase } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const CATEGORIES = ['Semua', 'Umum', 'Coding', 'Penulisan', 'Desain', 'Bahasa'];
 
@@ -33,7 +34,7 @@ export function Feed() {
       const response = await apiFetch<{ data: Job[] }>(`/jobs?${params.toString()}`);
       const openJobs = (response.data || [])
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      
+
       setJobs(openJobs);
       setFilteredJobs(openJobs);
     } catch (error) {
@@ -78,60 +79,98 @@ export function Feed() {
     return 'Selamat Malam';
   };
 
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const offset = window.scrollY;
+      // Gunakan threshold yang tinggi dan stabil
+      if (offset > 140) {
+        setScrolled(true);
+      } else if (offset < 40) {
+        setScrolled(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#F8F9FB] pb-20">
-      {/* Header */}
-      <div className="bg-white px-5 pt-6 pb-5 mb-4 shadow-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-sm text-gray-500 mb-0.5">{getGreeting()},</p>
-            <h1 className="text-xl font-bold text-gray-900">{user?.displayName || 'User'}</h1>
+      {/* 1. Greeting (Non-sticky) */}
+      <div className="bg-white px-5 pt-6 pb-0 relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <div className="animate-in fade-in slide-in-from-top-2 duration-500">
+            <p className="text-xs text-gray-500 mb-0">{getGreeting()},</p>
+            <h1 className="text-xl font-bold text-gray-900 tracking-tight">{user?.displayName || 'User'}</h1>
           </div>
           <img
             src={user?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.uid}`}
             alt="Avatar"
-            className="w-14 h-14 rounded-full ring-2 ring-gray-100"
+            className="w-12 h-12 rounded-full ring-2 ring-gray-100"
           />
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Cari tugas..."
-            className="w-full bg-[#F8F9FB] rounded-[12px] pl-12 pr-4 py-3.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-[#6366F1] placeholder:text-gray-400"
-          />
-        </div>
-
-        {/* Category Chips */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">
-          {CATEGORIES.map(category => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                selectedCategory === category
-                  ? 'bg-[#6366F1] text-white shadow-sm'
-                  : 'bg-[#F1F3F7] text-gray-700 hover:bg-gray-200 active:scale-95'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* Job List */}
-      <div className="px-5">
-        {isRefreshing && (
-          <div className="flex justify-center py-4">
-            <Loading size="sm" label="" />
+      {/* 2. Sticky Search & Category Section - Precision overlap to fix gap */}
+      <motion.div
+        className={`sticky top-0 z-30 bg-white mt-[-12px] transition-shadow duration-300 ${scrolled ? 'shadow-md' : 'shadow-none'
+          }`}
+      >
+        <div className="px-5 py-3">
+          {/* Search Bar - Static when sticky */}
+          <div className={`relative ${scrolled ? 'mb-2' : 'mb-4'}`}>
+            <motion.div
+              animate={{ 
+                width: scrolled ? 16 : 20, 
+                height: scrolled ? 16 : 20,
+                left: scrolled ? 16 : 16 
+              }}
+              className="absolute top-1/2 -translate-y-1/2 text-gray-400 z-10"
+            >
+              <Search className="w-full h-full" />
+            </motion.div>
+            <motion.input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Cari tugas..."
+              animate={{ 
+                height: scrolled ? 36 : 48,
+                paddingLeft: scrolled ? 44 : 48,
+                fontSize: scrolled ? '14px' : '15px'
+              }}
+              className="w-full bg-[#F8F9FB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
+            />
           </div>
-        )}
 
+          {/* Category Chips - Non-motion for stability */}
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-5 px-5">
+            {CATEGORIES.map(category => (
+              <motion.button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                animate={{ 
+                  paddingLeft: scrolled ? 14 : 20,
+                  paddingRight: scrolled ? 14 : 20,
+                  paddingTop: scrolled ? 4 : 10,
+                  paddingBottom: scrolled ? 4 : 10,
+                  fontSize: scrolled ? '13px' : '14px'
+                }}
+                className={`flex-shrink-0 rounded-full font-bold ${selectedCategory === category
+                    ? 'bg-[#6366F1] text-white shadow-sm'
+                    : 'bg-[#F1F3F7] text-gray-700 active:scale-95'
+                  }`}
+              >
+                {category}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Job List - Masonry Layout */}
+      <div className="px-3 mt-4">
         {isLoading ? (
           <div className="py-20">
             <Loading label="Mencari tugas terbaik untukmu..." />
@@ -144,14 +183,16 @@ export function Feed() {
               searchQuery
                 ? 'Coba kata kunci lain'
                 : selectedCategory !== 'Semua'
-                ? `Belum ada tugas di kategori ${selectedCategory}`
-                : 'Belum ada tugas terbuka'
+                  ? `Belum ada tugas di kategori ${selectedCategory}`
+                  : 'Belum ada tugas terbuka'
             }
           />
         ) : (
-          <div className="space-y-4">
+          <div className="columns-2 gap-2.5 space-y-2.5">
             {filteredJobs.map(job => (
-              <JobCard key={job.id} job={job} />
+              <div key={job.id} className="break-inside-avoid mb-2.5">
+                <JobCard job={job} />
+              </div>
             ))}
           </div>
         )}

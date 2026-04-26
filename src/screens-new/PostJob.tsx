@@ -23,6 +23,32 @@ export function PostJob() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isPolishing, setIsPolishing] = useState(false);
+
+  const handleAIPolish = async () => {
+    if (!description) {
+      showToast('Tulis deskripsi terlebih dahulu', 'info');
+      return;
+    }
+
+    try {
+      setIsPolishing(true);
+      const res = await apiFetch<{ data: string }>('/ai/polish', {
+        method: 'POST',
+        body: JSON.stringify({ description }),
+      });
+      
+      if (res.data) {
+        setDescription(res.data);
+        showToast('Deskripsi berhasil diperhalus oleh AI!', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to polish:', err);
+      showToast('Gagal memproses AI Polish', 'error');
+    } finally {
+      setIsPolishing(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!user || !title || !category || !description || !budget || !deadline || !agreeEthics) {
@@ -164,9 +190,13 @@ export function PostJob() {
                 <label className="block text-sm font-medium text-gray-700">
                   Deskripsi *
                 </label>
-                <button className="text-xs text-gray-900 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  AI Polish
+                <button 
+                  onClick={handleAIPolish}
+                  disabled={isPolishing}
+                  className={`text-xs flex items-center gap-1 transition-colors ${isPolishing ? 'text-[#6366f2] animate-pulse' : 'text-gray-900 hover:text-[#6366f2]'}`}
+                >
+                  <Sparkles className={`w-3 h-3 ${isPolishing ? 'animate-spin' : ''}`} />
+                  {isPolishing ? 'Polishing...' : 'AI Polish'}
                 </button>
               </div>
               <textarea

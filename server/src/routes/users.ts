@@ -3,6 +3,35 @@ import { getDb } from '../db/mongo';
 
 const router = Router();
 
+// List & Search Users
+router.get('/', async (req, res) => {
+  const db = getDb();
+  const { role, category, q, minRating, limit, sort } = req.query;
+
+  const query: any = {};
+  if (role) query.role = role;
+  if (category) query.category = category;
+  if (q) {
+    query.displayName = { $regex: '^' + String(q), $options: 'i' };
+  }
+  if (minRating) {
+    query.rating = { $gte: Number(minRating) };
+  }
+
+  const sortOption: any = {};
+  if (sort === 'rating') sortOption.rating = -1;
+  else if (sort === 'totalRatings') sortOption.totalRatings = -1;
+  else sortOption.createdAt = -1;
+
+  const users = await db.collection('users')
+    .find(query)
+    .sort(sortOption)
+    .limit(Math.min(Number(limit ?? 20), 50))
+    .toArray();
+
+  res.json({ data: users });
+});
+
 // Get Top Workers
 router.get('/top-workers', async (req, res) => {
   const db = getDb();

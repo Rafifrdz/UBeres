@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { connectMongo } from '../db/mongo';
+import { generateAIInsight } from '../lib/ai';
 
 type JobStatus = 'open' | 'assigned' | 'paid' | 'working' | 'submitting' | 'completed' | 'disputed' | 'refunded';
 
@@ -194,9 +195,23 @@ router.post('/', async (req, res) => {
     images,
     createdAt: now,
     updatedAt: now,
+    aiInsight: '',
   };
 
   const result = await db.collection('jobs').insertOne(payload);
+
+  // Generate AI Insight in background (non-blocking)
+  generateAIInsight(title, description, budget, deadline).then(insight => {
+    if (insight) {
+      console.log(`💾 Saving AI Insight to Job ${result.insertedId}...`);
+      db.collection('jobs').updateOne(
+        { _id: result.insertedId },
+        { $set: { aiInsight: insight } }
+      ).then(() => console.log("✨ AI Insight saved successfully!"))
+       .catch(err => console.error('❌ Failed to update job with AI insight:', err));
+    }
+  }).catch(err => console.error('❌ AI Insight background task failed:', err));
+
   const created = await db.collection('jobs').findOne({ _id: new ObjectId(result.insertedId) });
 
   return res.status(201).json({ data: toJobResponse(created as Record<string, unknown>) });
@@ -345,14 +360,26 @@ router.post('/:jobId/bids', async (req, res) => {
     return res.status(resolved.error.status).json({ error: resolved.error.message });
   }
 
-  const actorId = String(req.body?.workerId ?? req.header('x-user-id') ?? '').trim();
-  const workerName = String(req.body?.workerName ?? '').trim();
-  const workerRating = req.body?.workerRating ? Number(req.body.workerRating) : undefined;
+  let actorId = String(req.body?.workerId ?? req.header('x-user-id') ?? '').trim();
+  let workerName = String(req.body?.workerName ?? '').trim();
+  let workerRating = req.body?.workerRating ? Number(req.body.workerRating) : undefined;
   const price = Number(req.body?.price ?? 0);
   const pitch = String(req.body?.pitch ?? '').trim();
 
+  // Jika workerName kosong, coba ambil dari database users
+  if (actorId && !workerName) {
+    const worker = await resolved.db.collection('users').findOne({ uid: actorId });
+    if (worker) {
+      workerName = worker.displayName || 'Worker UB';
+      workerRating = worker.rating;
+    } else {
+      // Fallback jika user belum terdaftar di koleksi users
+      workerName = 'Worker Terverifikasi';
+    }
+  }
+
   if (!actorId || !workerName || !pitch || Number.isNaN(price) || price <= 0) {
-    return res.status(400).json({ error: 'Data bid tidak valid' });
+    return res.status(400).json({ error: 'Data bid tidak valid. Pastikan profil Anda sudah lengkap.' });
   }
 
   if (String(resolved.job.status) !== 'open') {

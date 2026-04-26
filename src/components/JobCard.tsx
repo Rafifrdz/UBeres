@@ -29,60 +29,63 @@ export function JobCard({ job }: JobCardProps) {
   return (
     <div
       onClick={() => navigate(`/job/${job.id}`)}
-      className="bg-white rounded-[18px] overflow-hidden shadow-sm border border-gray-100 cursor-pointer hover:shadow-md hover:border-gray-200 transition-all active:scale-[0.98]"
+      className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] flex flex-col h-full"
     >
-      {/* Featured Image */}
-      {job.images && job.images.length > 0 && (
-        <div className="w-full h-44 overflow-hidden border-b border-gray-50">
-          <img 
-            src={job.images[0]} 
-            alt={job.title} 
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" 
+      {/* Featured Image - Only if exists */}
+      {job.images && job.images.length > 0 ? (
+        <div className="relative aspect-square bg-gray-50">
+          <img
+            src={job.images[0]}
+            alt={job.title}
+            className="w-full h-full object-cover"
           />
+          <div className="absolute top-2 left-2">
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${categoryColors[job.category] || 'bg-gray-100 text-gray-900'} shadow-sm`}>
+              {job.category}
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* No Image State - Show category badge at top of content */
+        <div className="p-2.5 pb-0">
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${categoryColors[job.category] || 'bg-gray-100 text-gray-900'}`}>
+            {job.category}
+          </span>
         </div>
       )}
 
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${categoryColors[job.category]}`}>
-                {job.category}
-              </span>
-              <span className="text-xs text-gray-500">{timeAgo}</span>
-            </div>
-            <h3 className="text-base font-semibold text-[#6366F1] line-clamp-2 leading-snug">{job.title}</h3>
-          </div>
-          <img
-            src={job.isAnonymous ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=anon&backgroundColor=b6e3f4' : (job.clientPhotoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${job.clientId}`)}
-            alt="Client"
-            onError={(e) => {
-              if (!job.isAnonymous) {
-                (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${job.clientId}`;
-              }
-            }}
-            className="w-12 h-12 rounded-full flex-shrink-0 ring-2 ring-gray-100 object-cover"
-          />
+      <div className="p-2.5 flex flex-col flex-1">
+        {/* Title - Larger & Bolder */}
+        <h3 className="text-[15px] font-bold text-gray-800 line-clamp-2 leading-tight mb-1">
+          {job.title}
+        </h3>
+
+        {/* Price - Smaller */}
+        <div className="text-[13px] font-semibold text-[#6366F1] mb-1.5">
+          Rp {(job.budget || 0).toLocaleString('id-ID')}
         </div>
 
-        {/* Description */}
-        <p className="text-sm text-gray-600 line-clamp-2 mb-4 leading-relaxed">{job.description}</p>
+        {/* Uploader - New Section */}
+        <div className="flex items-center gap-1.5 mb-2.5">
+          <img
+            src={job.isAnonymous ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=anon&backgroundColor=b6e3f4' : (job.clientPhotoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${job.clientId}`)}
+            alt="Uploader"
+            className="w-4 h-4 rounded-full object-cover ring-1 ring-gray-100"
+          />
+          <span className="text-[11px] text-gray-500 truncate font-medium">
+            {job.isAnonymous ? 'Anonim' : (job.clientName || 'User')}
+          </span>
+        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="px-3.5 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold">
-              Rp {(job.budget || 0).toLocaleString('id-ID')}
-            </div>
-            <div className={`flex items-center gap-1 text-sm ${isUrgent ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-              <Clock className="w-4 h-4" />
-              {new Date(job.deadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-            </div>
+        {/* Footer Info - Compact */}
+        <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between text-[10px] text-gray-500">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>{timeAgo}</span>
           </div>
-          <div className="flex items-center gap-1 text-sm text-gray-500">
-            <Users className="w-4 h-4" />
-            <span className="font-medium">{job.bidCount}</span>
+          <div className="flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            <span>{job.bidCount} bid</span>
           </div>
         </div>
       </div>

@@ -261,7 +261,7 @@
   }
 
   body {
-    overflow-x: hidden;
+    overflow-x: visible;
   }
 
   /* Smooth transition untuk scrollbar */

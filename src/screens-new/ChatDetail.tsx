@@ -1,106 +1,72 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { storage, Message, generateId, statusConfig } from '../utils-new/storage';
+import { apiFetch } from '../lib/api';
+import { io, Socket } from 'socket.io-client';
 import { ArrowLeft, Send, Paperclip, Image as ImageIcon, FileText, Download, Check, CheckCheck, MoreVertical, Info } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { useToast } from '../components/Toast';
 import { BottomSheet } from '../components/BottomSheet';
 
+const statusConfig: Record<string, { color: string; label: string }> = {
+  open: { color: 'bg-gray-100 text-gray-700', label: 'Terbuka' },
+  assigned: { color: 'bg-gray-100 text-gray-700', label: 'Ditugaskan' },
+  paid: { color: 'bg-gray-100 text-gray-700', label: 'Dibayar' },
+  working: { color: 'bg-gray-100 text-gray-700', label: 'Dikerjakan' },
+  submitting: { color: 'bg-gray-100 text-gray-700', label: 'Menunggu Review' },
+  completed: { color: 'bg-gray-100 text-gray-700', label: 'Selesai' },
+};
+
 export function ChatDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const { user } = useApp();
   const { showToast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [job, setJob] = useState<any>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const job = jobId ? storage.getJobs().find(j => j.id === jobId) : null;
   const otherUserId = user?.role === 'client' ? job?.workerId : job?.clientId;
 
-  // Initialize with mock messages if empty
+  // Initialize Socket
+  useEffect(() => {
+    const newSocket = io('http://localhost:8080'); // Sesuaikan dengan API URL
+    setSocket(newSocket);
+
+    if (jobId) {
+      newSocket.emit('join_room', jobId);
+    }
+
+    newSocket.on('receive_message', (message: any) => {
+      setMessages((prev) => [...prev, message]);
+    });
+
+    return () => {
+      newSocket.close();
+    };
+  }, [jobId]);
+
+  // Load Job Info & History
   useEffect(() => {
     if (!jobId || !user) return;
 
-    const currentJob = storage.getJobs().find(j => j.id === jobId);
-    if (!currentJob) return;
+    // Load Job Info
+    apiFetch<any>(`/jobs/${jobId}`)
+      .then(res => setJob(res.data))
+      .catch(err => console.error('Failed to load job:', err));
 
-    const currentOtherUserId = user.role === 'client' ? currentJob.workerId : currentJob.clientId;
-    let jobMessages = storage.getMessages(jobId);
-
-    // Add mock messages for demo if empty
-    if (jobMessages.length === 0) {
-      const mockMessages: Message[] = [
-        {
-          id: generateId(),
-          jobId,
-          senderId: currentOtherUserId || 'other',
-          content: 'Halo! Terima kasih sudah memilih bid saya 🙏',
-          type: 'text',
-          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: 'system',
-          content: `Bid telah diterima. Status: ${statusConfig[currentJob.status]?.label}`,
-          type: 'system',
-          createdAt: new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: user.uid,
-          content: 'Sama-sama! Kapan bisa mulai kerjakan?',
-          type: 'text',
-          createdAt: new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: currentOtherUserId || 'other',
-          content: 'Bisa mulai hari ini kok. File requirement-nya bisa dikirim?',
-          type: 'text',
-          createdAt: new Date(Date.now() - 21 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: user.uid,
-          content: 'Oke siap, ini saya kirim file brief-nya ya',
-          type: 'text',
-          createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: user.uid,
-          content: 'Brief_Project.pdf',
-          type: 'file',
-          fileUrl: 'https://example.com/brief.pdf',
-          createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: generateId(),
-          jobId,
-          senderId: currentOtherUserId || 'other',
-          content: 'Oke noted, saya cek dulu ya. Estimasi selesai besok sore',
-          type: 'text',
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        },
-      ];
-
-      mockMessages.forEach(msg => storage.addMessage(msg));
-      jobMessages = mockMessages;
-    }
-
-    setMessages(jobMessages);
-  }, [jobId]);
+    // Load Message History
+    apiFetch<{ data: any[] }>(`/jobs/${jobId}/messages?actorId=${user.uid}`)
+      .then(res => setMessages(res.data || []))
+      .catch(err => console.error('Failed to load history:', err));
+  }, [jobId, user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -115,36 +81,16 @@ export function ChatDetail() {
   }, [inputMessage]);
 
   const handleSend = () => {
-    if (!inputMessage.trim() || !user || !jobId) return;
+    if (!inputMessage.trim() || !user || !jobId || !socket) return;
 
-    const newMessage: Message = {
-      id: generateId(),
+    const messageData = {
       jobId,
       senderId: user.uid,
-      content: inputMessage.trim(),
-      type: 'text',
-      createdAt: new Date().toISOString(),
+      text: inputMessage.trim(),
     };
 
-    storage.addMessage(newMessage);
-    setMessages([...messages, newMessage]);
+    socket.emit('send_message', messageData);
     setInputMessage('');
-
-    // Simulate typing response
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const reply: Message = {
-        id: generateId(),
-        jobId,
-        senderId: otherUserId || 'other',
-        content: 'Oke siap! 👍',
-        type: 'text',
-        createdAt: new Date().toISOString(),
-      };
-      storage.addMessage(reply);
-      setMessages(prev => [...prev, reply]);
-    }, 2000);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -305,7 +251,7 @@ export function ChatDetail() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{message.content}</p>
+                              <p className="text-sm font-medium truncate">{message.text}</p>
                               <p className={`text-xs ${isOwn ? 'text-white/70' : 'text-gray-500'}`}>
                                 {(Math.random() * 500 + 100).toFixed(0)} KB
                               </p>
@@ -334,7 +280,7 @@ export function ChatDetail() {
                           }`}
                         >
                           <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
-                            {message.content}
+                            {message.text}
                           </p>
                           <div className="flex items-center justify-end gap-1 mt-1">
                             <p className={`text-xs ${isOwn ? 'text-white/70' : 'text-gray-500'}`}>
